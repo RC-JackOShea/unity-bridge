@@ -97,13 +97,45 @@ namespace UnityBridge
             }
             
             DrawHeader();
+            EditorGUILayout.Space();
             DrawServerStatus();
+            EditorGUILayout.Space();
+            DrawLine();
             DrawCommandHistory();
         }
-        
+
+        private void DrawLine()
+        {
+            EditorGUILayout.Space(5);
+            
+            EditorGUILayout.BeginHorizontal();
+            
+            // 10px buffer on left
+            GUILayout.Space(10);
+            
+            // Get a rect for the horizontal line with reduced width
+            var rect = GUILayoutUtility.GetRect(0, 1, GUILayout.ExpandWidth(true), GUILayout.Height(1));
+            
+            // Draw a subtle gray line
+            EditorGUI.DrawRect(rect, new Color(0.5f, 0.5f, 0.5f, 0.5f));
+            
+            // 10px buffer on right
+            GUILayout.Space(10);
+            
+            EditorGUILayout.EndHorizontal();
+            
+            EditorGUILayout.Space(5);
+        }
+
+
         private void DrawHeader()
         {
             EditorGUILayout.Space();
+            
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(10);
+            
+            EditorGUILayout.BeginVertical();
             EditorGUILayout.LabelField("Unity Bridge Monitor", EditorStyles.boldLabel);
             EditorGUILayout.Space();
             
@@ -125,27 +157,39 @@ namespace UnityBridge
             EditorGUILayout.EndHorizontal();
             
             EditorGUILayout.Space();
+            EditorGUILayout.EndVertical();
+            
+            GUILayout.Space(10);
+            EditorGUILayout.EndHorizontal();
         }
         
         private void DrawServerStatus()
         {
-            EditorGUILayout.LabelField("Server Status", EditorStyles.boldLabel);
-            
             EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(10);
+            
+            EditorGUILayout.BeginVertical();
+            EditorGUILayout.LabelField("Server Status", EditorStyles.boldLabel);
+            EditorGUILayout.Space();
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.Space();
             
             // Status indicator (green/red dot)
             bool isRunning = UnityBridgeServer.IsServerRunning();
             Color statusColor = isRunning ? Color.green : Color.red;
             string statusText = isRunning ? "ONLINE" : "OFFLINE";
-            
+
             // Draw colored status dot
-            var rect = GUILayoutUtility.GetRect(20, 20, GUILayout.Width(20), GUILayout.Height(20));
+            var rect = GUILayoutUtility.GetRect(10, EditorGUIUtility.singleLineHeight, GUILayout.Width(10));
             Handles.color = statusColor;
-            Vector3 center = new Vector3(rect.center.x, rect.center.y, 0);
-            float radius = Mathf.Min(rect.width, rect.height) / 2f;
+            Vector3 center = new Vector3(rect.center.x, rect.center.y + 3f, 0); // Adjust Y position to match text baseline
+            float radius = 4f; // Fixed radius for consistency
             Handles.DrawSolidDisc(center, Vector3.forward, radius);
             
-            EditorGUILayout.LabelField(statusText, GUILayout.Width(60));
+            EditorGUILayout.LabelField(statusText, GUILayout.Width(50), GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            
+            EditorGUILayout.LabelField("|", GUILayout.Width(10), GUILayout.Height(EditorGUIUtility.singleLineHeight));
             
             // Additional status info
             if (isRunning)
@@ -153,27 +197,32 @@ namespace UnityBridge
                 bool isCompiling = UnityBridgeServer.IsCompiling();
                 int logCount = UnityBridgeServer.GetLogCount();
                 
-                EditorGUILayout.LabelField($"Port: 5556", GUILayout.Width(70));
-                EditorGUILayout.LabelField($"Logs: {logCount}", GUILayout.Width(60));
+                EditorGUILayout.LabelField($"Port: 5556", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(70));
+                EditorGUILayout.LabelField("|", GUILayout.Width(10), GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                EditorGUILayout.LabelField($"Logs: {logCount}", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(70));
+                EditorGUILayout.LabelField("|", GUILayout.Width(10), GUILayout.Height(EditorGUIUtility.singleLineHeight));
                 
                 if (isCompiling)
                 {
                     var compilingRect = GUILayoutUtility.GetRect(15, 15, GUILayout.Width(15), GUILayout.Height(15));
                     EditorGUI.DrawRect(compilingRect, Color.yellow);
-                    EditorGUILayout.LabelField("COMPILING", GUILayout.Width(80));
+                    EditorGUILayout.LabelField("COMPILING", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(80));
                 }
                 else
                 {
-                    EditorGUILayout.LabelField("Ready", GUILayout.Width(50));
+                    EditorGUILayout.LabelField("Ready", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(50));
                 }
             }
             else
             {
-                EditorGUILayout.LabelField("Server not responding");
+                EditorGUILayout.LabelField("Server not responding", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(100));
             }
             
+            GUILayout.FlexibleSpace(); // Push all elements to the left
             EditorGUILayout.EndHorizontal();
             
+            EditorGUILayout.Space(10);
+
             // Control buttons
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Start Server", GUILayout.Width(100)))
@@ -200,12 +249,19 @@ namespace UnityBridge
                 AddCommandToHistory("clear_logs", "Manual", "Logs cleared", true);
             }
             EditorGUILayout.EndHorizontal();
-            
             EditorGUILayout.Space();
+            EditorGUILayout.EndVertical();
+            
+            GUILayout.Space(10);
+            EditorGUILayout.EndHorizontal();
         }
         
         private void DrawCommandHistory()
         {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(10);
+            
+            EditorGUILayout.BeginVertical();
             EditorGUILayout.LabelField("Command History", EditorStyles.boldLabel);
             
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
@@ -228,6 +284,10 @@ namespace UnityBridge
             }
             
             EditorGUILayout.EndScrollView();
+            EditorGUILayout.EndVertical();
+            
+            GUILayout.Space(10);
+            EditorGUILayout.EndHorizontal();
         }
         
         private void DrawCommandEntry(CommandHistoryEntry entry)
