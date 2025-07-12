@@ -104,7 +104,7 @@ namespace UnityBridge
             }
         }
         
-        static UnityLogServer()
+        static UnityBridgeServer()
         {
             Initialize();
         }
