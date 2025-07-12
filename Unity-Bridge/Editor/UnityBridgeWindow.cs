@@ -140,7 +140,10 @@ namespace UnityBridge
             
             // Draw colored status dot
             var rect = GUILayoutUtility.GetRect(20, 20, GUILayout.Width(20), GUILayout.Height(20));
-            EditorGUI.DrawRect(rect, statusColor);
+            Handles.color = statusColor;
+            Vector3 center = new Vector3(rect.center.x, rect.center.y, 0);
+            float radius = Mathf.Min(rect.width, rect.height) / 2f;
+            Handles.DrawSolidDisc(center, Vector3.forward, radius);
             
             EditorGUILayout.LabelField(statusText, GUILayout.Width(60));
             
