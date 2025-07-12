@@ -1,0 +1,24 @@
+{
+  "name": "com.unity.bridge",
+  "version": "1.0.0",
+  "displayName": "Unity Bridge",
+  "description": "HTTP API bridge for Unity Editor integration with external development tools - compilation, logs, and more",
+  "unity": "2020.3",
+  "keywords": [
+    "editor",
+    "tools",
+    "compilation",
+    "logs",
+    "http",
+    "api",
+    "bridge",
+    "development",
+    "integration"
+  ],
+  "author": {
+    "name": "Unity Bridge",
+    "email": "",
+    "url": ""
+  },
+  "type": "tool"
+}
