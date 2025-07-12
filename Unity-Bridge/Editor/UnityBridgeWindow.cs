@@ -207,7 +207,6 @@ namespace UnityBridge
                     var compilingRect = GUILayoutUtility.GetRect(10, EditorGUIUtility.singleLineHeight, GUILayout.Width(10));
                     Handles.color = Color.yellow;
                     center = new Vector3(compilingRect.center.x, compilingRect.center.y + 3f, 0); // Adjust Y position to match text baseline
-                    float radius = 4f; // Fixed radius for consistency
                     Handles.DrawSolidDisc(center, Vector3.forward, radius);
                     EditorGUILayout.LabelField("COMPILING", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(80));
                 }
