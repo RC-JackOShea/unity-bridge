@@ -30,6 +30,8 @@ namespace UnityBridge
         private static CompilationResult currentCompilation;
         private static readonly object lockObject = new object();
         
+        private static List<ExternalCommandEntry> externalCommands = new List<ExternalCommandEntry>();
+        
         private static Queue<Action> pendingUnityActions = new Queue<Action>();
         
         [Serializable]
@@ -53,6 +55,18 @@ namespace UnityBridge
             public string startTime;
             public string endTime;
             public double duration;
+        }
+        
+        [Serializable]
+        public class ExternalCommandEntry
+        {
+            public string command;
+            public string timestamp;
+            public string endpoint;
+            public string method;
+            public string userAgent;
+            public bool success;
+            public string response;
         }
         
         [Serializable]
@@ -360,6 +374,7 @@ namespace UnityBridge
                 
                 var path = request.Url.AbsolutePath.ToLower();
                 var method = request.HttpMethod;
+                var userAgent = request.UserAgent ?? "Unknown";
                 
                 ApiResponse apiResponse = null;
                 
@@ -410,6 +425,9 @@ namespace UnityBridge
                 response.ContentLength64 = buffer.Length;
                 response.OutputStream.Write(buffer, 0, buffer.Length);
                 response.Close();
+                
+                // Track external command
+                LogExternalCommand(path, method, userAgent, apiResponse?.status == "ok" || apiResponse?.status == "success" || apiResponse?.status == "started", apiResponse?.message ?? "");
             }
             catch (Exception e)
             {
@@ -577,7 +595,54 @@ namespace UnityBridge
             {
                 logs.Clear();
                 compilationHistory.Clear();
+                externalCommands.Clear();
                 Debug.Log("[UnityBridge] Logs cleared manually");
+            }
+        }
+        
+        private static void LogExternalCommand(string endpoint, string method, string userAgent, bool success, string response)
+        {
+            lock (lockObject)
+            {
+                var commandName = endpoint.TrimStart('/');
+                if (string.IsNullOrEmpty(commandName)) commandName = "unknown";
+                
+                var entry = new ExternalCommandEntry
+                {
+                    command = commandName,
+                    timestamp = DateTime.Now.ToString("HH:mm:ss"),
+                    endpoint = endpoint,
+                    method = method,
+                    userAgent = userAgent,
+                    success = success,
+                    response = response
+                };
+                
+                externalCommands.Add(entry);
+                
+                // Keep only last 100 commands
+                if (externalCommands.Count > 100)
+                {
+                    externalCommands.RemoveAt(0);
+                }
+                
+                // Also notify the window if it exists
+                try
+                {
+                    UnityBridgeWindow.AddExternalCommand(commandName, response, success);
+                }
+                catch (Exception)
+                {
+                    // Window might not exist, ignore
+                }
+            }
+        }
+        
+        public static List<ExternalCommandEntry> GetExternalCommands()
+        {
+            lock (lockObject)
+            {
+                return new List<ExternalCommandEntry>(externalCommands);
             }
         }
         
