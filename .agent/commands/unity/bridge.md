@@ -90,6 +90,85 @@ fi
 echo "Unity Bridge tool located at: $UNITY_BRIDGE_PATH"
 ```
 
+## Input Events Reference
+
+### Coordinate System
+
+All input coordinates are **screen pixels**. `(0, 0)` is the **bottom-left** corner of the Game view. `(Screen.width, Screen.height)` is the top-right. Use the `screenshot` command to determine the current Game view resolution (reported in the result as `width` and `height`).
+
+### Input Commands
+
+#### `input tap X Y [duration]`
+Simulates a single tap/click at screen coordinates `(X, Y)`. Duration is optional (default `0.05s`).
+
+- **UI elements:** Uses `ExecuteEvents` — raycasts into the UI, walks up the hierarchy to find the click handler (e.g., `Button`), and fires `pointerDown` → `pointerUp` → `pointerClick`.
+- **Non-UI:** Falls back to queuing a mouse press/release on `Mouse.current`.
+
+```bash
+bash .agent/tools/unity_bridge.sh input tap 120 60
+```
+
+#### `input hold X Y [duration]`
+Simulates a long press at `(X, Y)` for `duration` seconds (default `1.0s`). Fires `pointerDown` immediately, then `pointerUp` + `pointerClick` after the duration elapses.
+
+```bash
+bash .agent/tools/unity_bridge.sh input hold 500 400 2.0
+```
+
+#### `input multi_tap X Y [count] [interval]`
+Simulates multiple taps at `(X, Y)`. Default count is `2`, default interval is `0.15s`.
+
+```bash
+bash .agent/tools/unity_bridge.sh input multi_tap 300 300 3 0.2
+```
+
+#### `input drag SX SY EX EY [duration]`
+Drags from `(SX, SY)` to `(EX, EY)` over `duration` seconds (default `0.3s`). Uses virtual Touchscreen device with touch `Began` → `Moved` → `Ended` events.
+
+```bash
+bash .agent/tools/unity_bridge.sh input drag 100 500 400 500 0.5
+```
+
+#### `input swipe SX SY EX EY [duration]`
+Same as drag but semantically a swipe (faster gesture). Default duration `0.15s`.
+
+```bash
+bash .agent/tools/unity_bridge.sh input swipe 500 200 500 800 0.3
+```
+
+#### `input pinch CX CY SD ED [duration]`
+Two-finger pinch centered at `(CX, CY)`. `SD` is starting distance between fingers, `ED` is ending distance. Uses two virtual touch slots. Default duration `0.5s`.
+
+```bash
+bash .agent/tools/unity_bridge.sh input pinch 500 500 200 50 0.5
+```
+
+### How to Calculate Tap Coordinates for UI Elements
+
+Given a RectTransform with:
+- `anchorMin = (0, 0)`, `anchorMax = (0, 0)`, `pivot = (0, 0)`
+- `anchoredPosition = (20, 20)`, `sizeDelta = (200, 80)`
+
+The element occupies screen pixels `(20, 20)` to `(220, 100)`. Its center is `(120, 60)`.
+
+For other anchor configurations, you need to account for the anchor position relative to the parent, the pivot offset, and the canvas scaling mode.
+
+### UI Prerequisites for Input
+
+For tap/hold/multi_tap to interact with UI elements, the scene must have:
+
+1. **EventSystem** with **InputSystemUIInputModule** (not `StandaloneInputModule`)
+2. **Canvas** with a **GraphicRaycaster** component
+3. UI element must have **raycastTarget = true** on its Graphic/Image component
+4. An interactive component (e.g., `Button`) that implements `IPointerClickHandler`
+
+### Known Limitations
+
+- **ScreenSpaceOverlay** canvases are not captured in screenshots (camera RenderTexture approach), but they work reliably for input raycasting
+- **ScreenSpaceCamera** canvases appear in screenshots but require a camera reference to be set on the Canvas component
+- Gesture inputs (drag/swipe/pinch) use a virtual Touchscreen device and may not interact with UI elements that only respond to pointer events (not touch events)
+- Input events dispatched via `ExecuteEvents` execute synchronously in the editor update loop — check `logs` after a brief delay to see handler output
+
 ## Security Considerations
 - Verify script permissions before execution
 - Validate script integrity if required
