@@ -50,9 +50,11 @@ namespace UnityBridge
         private void OnLogReceived(string condition, string stackTrace, LogType type)
         {
             // Look for Unity Bridge command indicators
-            if (condition.Contains("[UnityBridge]") && (condition.Contains("health") || 
-                condition.Contains("compile") || condition.Contains("logs") || 
-                condition.Contains("status") || condition.Contains("clear")))
+            if (condition.Contains("[UnityBridge]") && (condition.Contains("health") ||
+                condition.Contains("compile") || condition.Contains("logs") ||
+                condition.Contains("status") || condition.Contains("clear") ||
+                condition.Contains("playmode") || condition.Contains("screenshot") ||
+                condition.Contains("input")))
             {
                 lock (commandHistoryLock)
                 {
@@ -81,6 +83,9 @@ namespace UnityBridge
             // Extract command from log message
             if (logMessage.Contains("health")) return "health";
             if (logMessage.Contains("compile")) return "compile";
+            if (logMessage.Contains("playmode")) return "playmode";
+            if (logMessage.Contains("screenshot")) return "screenshot";
+            if (logMessage.Contains("input")) return "input";
             if (logMessage.Contains("logs")) return "logs";
             if (logMessage.Contains("status")) return "status";
             if (logMessage.Contains("clear")) return "clear";
@@ -209,6 +214,14 @@ namespace UnityBridge
                     center = new Vector3(compilingRect.center.x, compilingRect.center.y + 3f, 0); // Adjust Y position to match text baseline
                     Handles.DrawSolidDisc(center, Vector3.forward, radius);
                     EditorGUILayout.LabelField("COMPILING", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(80));
+                }
+                else if (UnityBridgeServer.IsPlaying())
+                {
+                    var playingRect = GUILayoutUtility.GetRect(10, EditorGUIUtility.singleLineHeight, GUILayout.Width(10));
+                    Handles.color = Color.cyan;
+                    center = new Vector3(playingRect.center.x, playingRect.center.y + 3f, 0);
+                    Handles.DrawSolidDisc(center, Vector3.forward, radius);
+                    EditorGUILayout.LabelField("PLAYING", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(60));
                 }
                 else
                 {

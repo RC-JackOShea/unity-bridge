@@ -1,7 +1,7 @@
 {
     "name": "UnityBridge.Editor",
     "rootNamespace": "UnityBridge",
-    "references": [],
+    "references": ["Unity.InputSystem"],
     "includePlatforms": [
         "Editor"
     ],
