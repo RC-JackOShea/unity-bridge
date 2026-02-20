@@ -382,6 +382,61 @@ emulate_input() {
     fi
 }
 
+# Function to execute a static method via reflection
+execute_method() {
+    local method_path="$1"
+    local args_json="$2"
+
+    if [ -z "$method_path" ]; then
+        echo "Usage: $0 execute <Namespace.Class.Method> [argsJson]"
+        echo "Example: $0 execute UnityBridge.BridgeTools.Ping"
+        echo "Example: $0 execute UnityBridge.BridgeTools.Add '[1,2]'"
+        return 1
+    fi
+
+    echo "Executing: $method_path..."
+
+    # Build JSON body - args are passed as string array elements
+    if [ -z "$args_json" ] || [ "$args_json" = "[]" ]; then
+        json_body="{\"method\":\"$method_path\",\"args\":[]}"
+    else
+        # The args come as a JSON array string like '[1,2]' or '["hello"]'
+        # We need to convert to a string array for the ExecuteRequest DTO
+        # Strip outer brackets, split by comma, wrap each as a string element
+        inner=$(echo "$args_json" | sed 's/^\[//;s/\]$//')
+        # Build args array where each element is the raw JSON token as a string
+        IFS=',' read -ra TOKENS <<< "$inner"
+        args_str=""
+        for token in "${TOKENS[@]}"; do
+            trimmed=$(echo "$token" | sed 's/^ *//;s/ *$//')
+            if [ -n "$args_str" ]; then
+                args_str="$args_str,"
+            fi
+            args_str="$args_str\"$trimmed\""
+        done
+        json_body="{\"method\":\"$method_path\",\"args\":[$args_str]}"
+    fi
+
+    response=$(make_request "/execute" "POST" "$json_body")
+    clean_response=$(echo "$response" | grep '^{.*}' | head -1 | tr -d '\r')
+
+    if [ -n "$clean_response" ]; then
+        if echo "$clean_response" | grep -q '"success":true'; then
+            echo "✓ Execute succeeded"
+        else
+            echo "✗ Execute failed"
+        fi
+        if command -v jq >/dev/null 2>&1; then
+            echo "$clean_response" | jq '.'
+        else
+            echo "$clean_response"
+        fi
+    else
+        echo "✗ Failed to execute method"
+        return 1
+    fi
+}
+
 # Main script logic
 case "$1" in
     "compile")
@@ -409,9 +464,12 @@ case "$1" in
         shift
         check_server && emulate_input "$@"
         ;;
+    "execute")
+        check_server && execute_method "$2" "$3"
+        ;;
     *)
         echo "Unity Bridge Script"
-        echo "Usage: $0 {compile|logs|status|clear|health|play|screenshot|input}"
+        echo "Usage: $0 {compile|logs|status|clear|health|play|screenshot|input|execute}"
         echo ""
         echo "Commands:"
         echo "  compile              - Trigger Unity compilation and get results"
@@ -427,11 +485,14 @@ case "$1" in
         echo "  input swipe SX SY EX EY [dur] - Emulate swipe gesture"
         echo "  input pinch CX CY SD ED [dur] - Emulate pinch gesture"
         echo "  input multi_tap X Y [count] [interval] - Emulate multi-tap"
+        echo "  execute <Method> [args] - Execute static method via reflection"
         echo ""
         echo "Example: $0 play enter"
         echo "Example: $0 screenshot C:/temp/test.png"
         echo "Example: $0 input tap 500 300"
         echo "Example: $0 input multi_tap 500 300 3"
+        echo "Example: $0 execute UnityBridge.BridgeTools.Ping"
+        echo "Example: $0 execute UnityBridge.BridgeTools.Add '[1,2]'"
         exit 1
         ;;
 esac
