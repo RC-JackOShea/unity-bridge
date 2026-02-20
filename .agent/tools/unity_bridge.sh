@@ -412,7 +412,12 @@ execute_method() {
             if [ -n "$args_str" ]; then
                 args_str="$args_str,"
             fi
-            args_str="$args_str\"$trimmed\""
+            # If already a JSON-quoted string, pass through as-is
+            if [[ "$trimmed" == \"*\" ]]; then
+                args_str="$args_str$trimmed"
+            else
+                args_str="$args_str\"$trimmed\""
+            fi
         done
         json_body="{\"method\":\"$method_path\",\"args\":[$args_str]}"
     fi
