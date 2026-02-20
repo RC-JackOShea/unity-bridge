@@ -68,6 +68,13 @@ namespace UnityBridge
             public float interval;
         }
 
+        [Serializable]
+        public class ExecuteRequest
+        {
+            public string method;
+            public string[] args;
+        }
+
         // --- Response data classes ---
 
         [Serializable]
@@ -569,6 +576,13 @@ namespace UnityBridge
                         else if (method == "GET")
                             apiResponse = HandleInputGet();
                         break;
+                    case "/execute":
+                        if (method == "POST")
+                        {
+                            HandleExecuteDirect(request, response, path, method, userAgent);
+                            return; // bypass ApiResponse pipeline
+                        }
+                        break;
                 }
 
                 if (apiResponse == null)
@@ -992,6 +1006,56 @@ namespace UnityBridge
                 message = $"Active: {statusData.activeCount}, Completed: {statusData.completedCount}",
                 data = statusData
             };
+        }
+
+        // --- Execute Handler ---
+        // Returns {"success":true/false,"result"/"error":...} directly, bypassing ApiResponse.
+
+        private static void HandleExecuteDirect(HttpListenerRequest request, HttpListenerResponse response, string path, string httpMethod, string userAgent)
+        {
+            string resultJson;
+            try
+            {
+                var body = ReadRequestBody(request);
+                var req = JsonUtility.FromJson<ExecuteRequest>(body);
+
+                if (req == null || string.IsNullOrEmpty(req.method))
+                {
+                    resultJson = "{\"success\":false,\"error\":\"Missing 'method' field\"}";
+                    response.StatusCode = 400;
+                }
+                else
+                {
+                    // Build JSON array from args
+                    string argsJson = "[]";
+                    if (req.args != null && req.args.Length > 0)
+                    {
+                        argsJson = "[" + string.Join(",", req.args) + "]";
+                    }
+
+                    // Execute on main thread
+                    resultJson = QueueUnityAction(() => MethodExecutor.Execute(req.method, argsJson));
+
+                    if (resultJson == null)
+                        resultJson = "{\"success\":false,\"error\":\"Null result from executor\"}";
+
+                    response.StatusCode = resultJson.Contains("\"success\":true") ? 200 : 500;
+                }
+            }
+            catch (Exception ex)
+            {
+                resultJson = "{\"success\":false,\"error\":\"" + ex.Message.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"}";
+                response.StatusCode = 500;
+            }
+
+            var buffer = Encoding.UTF8.GetBytes(resultJson);
+            response.ContentType = "application/json";
+            response.ContentLength64 = buffer.Length;
+            response.OutputStream.Write(buffer, 0, buffer.Length);
+            response.Close();
+
+            bool success = resultJson.Contains("\"success\":true");
+            LogExternalCommand(path, httpMethod, userAgent, success, resultJson.Length > 200 ? resultJson.Substring(0, 200) : resultJson);
         }
 
         // Public API for Editor Window
