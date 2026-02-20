@@ -296,3 +296,4 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 | `Unity-Bridge/Editor/BridgeTools.cs` | Static tool methods (Ping, Add, future tools) |
 | `Unity-Bridge/Editor/MethodExecutor.cs` | Reflection-based method executor for /execute |
 | `Unity-Bridge/Editor/Tools/SceneInventoryTool.cs` | Scene discovery and hierarchy extraction |
+| `Unity-Bridge/Editor/Tools/ComponentDetailExtractor.cs` | Deep component property extraction via SerializedProperty |
