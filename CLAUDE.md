@@ -297,3 +297,4 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 | `Unity-Bridge/Editor/MethodExecutor.cs` | Reflection-based method executor for /execute |
 | `Unity-Bridge/Editor/Tools/SceneInventoryTool.cs` | Scene discovery and hierarchy extraction |
 | `Unity-Bridge/Editor/Tools/ComponentDetailExtractor.cs` | Deep component property extraction via SerializedProperty |
+| `Unity-Bridge/Editor/Tools/GUIDResolver.cs` | GUID-to-asset-path resolution with lazy cache |
