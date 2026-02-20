@@ -298,4 +298,6 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 | `Unity-Bridge/Editor/Tools/SceneInventoryTool.cs` | Scene discovery and hierarchy extraction |
 | `Unity-Bridge/Editor/Tools/ComponentDetailExtractor.cs` | Deep component property extraction via SerializedProperty |
 | `Unity-Bridge/Editor/Tools/GUIDResolver.cs` | GUID-to-asset-path resolution with lazy cache |
+| `Unity-Bridge/Editor/Tools/PrefabInventoryTool.cs` | Prefab discovery with variant/nested detection |
+| `Unity-Bridge/Editor/Tools/PrefabDetailExtractor.cs` | Full prefab hierarchy with properties and overrides |
 | `Unity-Bridge/Editor/Tools/AssetInventoryTool.cs` | Full asset manifest, dependencies, unreferenced detection |
