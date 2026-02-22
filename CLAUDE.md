@@ -308,3 +308,4 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 | `Unity-Bridge/Editor/Tools/UIToolkitTools.cs` | UXML/USS parsing, generation, and UI Toolkit asset discovery |
 | `Unity-Bridge/Editor/Tools/CodebaseAnalyzer.cs` | C# codebase analysis: classification, inheritance, dependencies, conventions |
 | `Unity-Bridge/Editor/Tools/BuildPipelineTool.cs` | Build configuration, execution, and report parsing |
+| `Unity-Bridge/Editor/Tools/PackageManagerTool.cs` | Package listing, install, remove, update, registry search |
