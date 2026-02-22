@@ -320,3 +320,4 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 | `Unity-Bridge/Editor/Tools/UIBuilder.cs` | JSON-driven UI hierarchy builder (Canvas, Button, Text, Slider, etc.) |
 | `Unity-Bridge/Editor/Tools/BrandSystem.cs` | Brand spec management, extraction, application, WCAG contrast validation |
 | `Unity-Bridge/Editor/Tools/VisualValidator.cs` | Rule-based visual validation: notBlank, dimensions, color diversity, baseline comparison, WCAG contrast |
+| `Unity-Bridge/Editor/Tools/NetworkTestOrchestrator.cs` | ParrelSync clone management, network framework detection, multi-instance test orchestration |
