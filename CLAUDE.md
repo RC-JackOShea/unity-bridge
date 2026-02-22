@@ -316,3 +316,4 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 | `Unity-Bridge/Editor/Tools/CodeReviewer.cs` | Regex-based static analysis with 5 review categories and severity ranking |
 | `Unity-Bridge/Editor/Tools/CodeGenerator.cs` | Convention-aware C# code generation (MonoBehaviour, Editor, Test scripts) |
 | `Unity-Bridge/Editor/Tools/BuildVerifier.cs` | Build launch, process monitoring, log analysis, and verification reports |
+| `Unity-Bridge/Editor/Tools/DocFetcher.cs` | API docs via reflection, package docs, best practices, approach comparisons |
