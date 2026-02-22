@@ -312,3 +312,4 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 | `Unity-Bridge/Editor/Tools/GameStateObserver.cs` | Runtime game state inspection via reflection (Play Mode only) |
 | `Unity-Bridge/Editor/Tools/ScreenshotValidator.cs` | Multi-resolution screenshot capture and pixel-level comparison |
 | `Unity-Bridge/Editor/Tools/TestRunner.cs` | Test execution (Edit/Play Mode), NUnit result parsing, project validators |
+| `Unity-Bridge/Editor/Tools/PlayModeInteractor.cs` | Scripted Play Mode interaction sequences with state checks and screenshots |
