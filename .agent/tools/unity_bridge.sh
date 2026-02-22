@@ -402,24 +402,27 @@ execute_method() {
     else
         # The args come as a JSON array string like '[1,2]' or '["hello"]'
         # We need to convert to a string array for the ExecuteRequest DTO
-        # Strip outer brackets, split by comma, wrap each as a string element
-        inner=$(echo "$args_json" | sed 's/^\[//;s/\]$//')
-        # Build args array where each element is the raw JSON token as a string
-        IFS=',' read -ra TOKENS <<< "$inner"
-        args_str=""
-        for token in "${TOKENS[@]}"; do
-            trimmed=$(echo "$token" | sed 's/^ *//;s/ *$//')
-            if [ -n "$args_str" ]; then
-                args_str="$args_str,"
-            fi
-            # If already a JSON-quoted string, pass through as-is
-            if [[ "$trimmed" == \"*\" ]]; then
-                args_str="$args_str$trimmed"
-            else
+        # Strip outer brackets to peek at the first element
+        inner=$(echo "$args_json" | sed 's/^ *\[//;s/\] *$//')
+        first_char=$(echo "$inner" | sed 's/^ *//' | cut -c1)
+
+        if [ "$first_char" = '"' ]; then
+            # Args are already JSON strings — pass through directly
+            # This preserves internal commas/brackets in string values
+            json_body="{\"method\":\"$method_path\",\"args\":$args_json}"
+        else
+            # Numeric/boolean args — wrap each as a string
+            IFS=',' read -ra TOKENS <<< "$inner"
+            args_str=""
+            for token in "${TOKENS[@]}"; do
+                trimmed=$(echo "$token" | sed 's/^ *//;s/ *$//')
+                if [ -n "$args_str" ]; then
+                    args_str="$args_str,"
+                fi
                 args_str="$args_str\"$trimmed\""
-            fi
-        done
-        json_body="{\"method\":\"$method_path\",\"args\":[$args_str]}"
+            done
+            json_body="{\"method\":\"$method_path\",\"args\":[$args_str]}"
+        fi
     fi
 
     response=$(make_request "/execute" "POST" "$json_body")
