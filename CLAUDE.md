@@ -301,3 +301,4 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 | `Unity-Bridge/Editor/Tools/PrefabInventoryTool.cs` | Prefab discovery with variant/nested detection |
 | `Unity-Bridge/Editor/Tools/PrefabDetailExtractor.cs` | Full prefab hierarchy with properties and overrides |
 | `Unity-Bridge/Editor/Tools/AssetInventoryTool.cs` | Full asset manifest, dependencies, unreferenced detection |
+| `Unity-Bridge/Editor/Tools/UIInventoryTool.cs` | Canvas scanning, UI tree extraction with layout and interaction data |
