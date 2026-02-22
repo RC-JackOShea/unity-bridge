@@ -303,3 +303,4 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 | `Unity-Bridge/Editor/Tools/AssetInventoryTool.cs` | Full asset manifest, dependencies, unreferenced detection |
 | `Unity-Bridge/Editor/Tools/UIInventoryTool.cs` | Canvas scanning, UI tree extraction with layout and interaction data |
 | `Unity-Bridge/Editor/Tools/PrefabCreator.cs` | Programmatic prefab creation and modification from JSON specs |
+| `Unity-Bridge/Editor/Tools/PrefabValidator.cs` | Prefab validation with configurable rules (missing scripts, broken refs, etc.) |
