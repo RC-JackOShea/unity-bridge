@@ -310,3 +310,4 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 | `Unity-Bridge/Editor/Tools/BuildPipelineTool.cs` | Build configuration, execution, and report parsing |
 | `Unity-Bridge/Editor/Tools/PackageManagerTool.cs` | Package listing, install, remove, update, registry search |
 | `Unity-Bridge/Editor/Tools/GameStateObserver.cs` | Runtime game state inspection via reflection (Play Mode only) |
+| `Unity-Bridge/Editor/Tools/ScreenshotValidator.cs` | Multi-resolution screenshot capture and pixel-level comparison |
