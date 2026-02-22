@@ -306,3 +306,4 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 | `Unity-Bridge/Editor/Tools/PrefabValidator.cs` | Prefab validation with configurable rules (missing scripts, broken refs, etc.) |
 | `Unity-Bridge/Editor/Tools/YAMLParser.cs` | Unity YAML file parser for .prefab and .unity files with class ID mapping |
 | `Unity-Bridge/Editor/Tools/UIToolkitTools.cs` | UXML/USS parsing, generation, and UI Toolkit asset discovery |
+| `Unity-Bridge/Editor/Tools/CodebaseAnalyzer.cs` | C# codebase analysis: classification, inheritance, dependencies, conventions |
