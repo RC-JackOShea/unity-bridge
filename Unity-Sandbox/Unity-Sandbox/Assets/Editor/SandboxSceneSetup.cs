@@ -20,7 +20,8 @@ namespace Game.Editor.Setup
             "EventSystem",
             "TestPlayer",
             "ScoreTriggerZone",
-            "UICanvas"
+            "UICanvas",
+            "TabSystem"
         };
 
         // Also clean up legacy names from before the single-canvas migration
@@ -78,6 +79,12 @@ namespace Game.Editor.Setup
 
                     placed.Add(name);
                 }
+
+                // Parent TabSystem under UICanvas
+                var tabSystem = GameObject.Find("TabSystem");
+                var uiCanvas = GameObject.Find("UICanvas");
+                if (tabSystem != null && uiCanvas != null)
+                    tabSystem.transform.SetParent(uiCanvas.transform, false);
 
                 // Save the scene
                 EditorSceneManager.SaveScene(scene);

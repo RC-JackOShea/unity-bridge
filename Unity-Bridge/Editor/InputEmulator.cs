@@ -241,6 +241,19 @@ namespace UnityBridge
             }
         }
 
+        // --- Convenience methods (used by PlayModeInteractor, IntegrationTestRunner) ---
+
+        public static string SimulateTap(float x, float y, float duration = 0.05f)
+        {
+            SimulatePointerClick(x, y);
+            return "tap_direct";
+        }
+
+        public static string SimulateHold(float x, float y, float duration = 1.0f)
+        {
+            return EnqueueInput(new HoldSequence(x, y, duration));
+        }
+
         // --- Core API ---
 
         public static void Initialize()

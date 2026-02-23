@@ -38,6 +38,7 @@ namespace Game.Editor.Setup
                 CreateTestPlayerPrefab();
                 CreateScoreTriggerZonePrefab(goldMat, scoreManagerAsset);
                 CreateUICanvasPrefab(scoreManagerAsset);
+                CreateTabSystemPrefab();
 
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
@@ -56,7 +57,8 @@ namespace Game.Editor.Setup
                 PrefabDir + "/EventSystem.prefab",
                 PrefabDir + "/TestPlayer.prefab",
                 PrefabDir + "/ScoreTriggerZone.prefab",
-                PrefabDir + "/UICanvas.prefab"
+                PrefabDir + "/UICanvas.prefab",
+                PrefabDir + "/TabSystem.prefab"
             };
             string[] expectedAssets = {
                 SODir + "/ScoreManager.asset",
@@ -116,7 +118,7 @@ namespace Game.Editor.Setup
 
             var smType = FindGameType("Game.Score.ScoreManager");
             if (smType == null)
-                throw new Exception("Game.Score.ScoreManager type not found");
+                return null;
 
             var asset = ScriptableObject.CreateInstance(smType);
             asset.name = "ScoreManager";
@@ -300,6 +302,124 @@ namespace Game.Editor.Setup
             overlay.SetActive(false);
 
             SavePrefab(canvasGo, path);
+        }
+
+        private static void CreateTabSystemPrefab()
+        {
+            string path = PrefabDir + "/TabSystem.prefab";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) return;
+
+            var root = new GameObject("TabSystem");
+            var rootRt = root.AddComponent<RectTransform>();
+            rootRt.anchorMin = Vector2.zero;
+            rootRt.anchorMax = Vector2.one;
+            rootRt.offsetMin = Vector2.zero;
+            rootRt.offsetMax = Vector2.zero;
+
+            // Add TabController component (wire fields later)
+            var tabControllerType = FindGameType("Game.UI.TabController");
+            Component tabController = null;
+            if (tabControllerType != null)
+                tabController = root.AddComponent(tabControllerType);
+
+            // --- TabBar (top 10% strip) ---
+            var tabBar = new GameObject("TabBar");
+            tabBar.transform.SetParent(root.transform, false);
+            var tabBarRt = tabBar.AddComponent<RectTransform>();
+            tabBarRt.anchorMin = new Vector2(0, 0.9f);
+            tabBarRt.anchorMax = new Vector2(1, 1);
+            tabBarRt.offsetMin = Vector2.zero;
+            tabBarRt.offsetMax = Vector2.zero;
+            var hlg = tabBar.AddComponent<HorizontalLayoutGroup>();
+            hlg.childForceExpandWidth = true;
+            hlg.childForceExpandHeight = true;
+            hlg.spacing = 2;
+
+            // Create 5 tab buttons
+            var buttons = new Button[5];
+            for (int i = 0; i < 5; i++)
+            {
+                var tab = new GameObject("Tab" + (i + 1));
+                tab.transform.SetParent(tabBar.transform, false);
+                var img = tab.AddComponent<Image>();
+                img.color = i == 0
+                    ? new Color(0.129f, 0.588f, 0.953f)
+                    : new Color(0.25f, 0.25f, 0.25f);
+                buttons[i] = tab.AddComponent<Button>();
+
+                CreateTMPChild(tab.transform, "Label", "Tab " + (i + 1), 20,
+                    Vector2.zero, Vector2.one, TextAlignmentOptions.Center);
+            }
+
+            // --- ContentArea (bottom 90%) ---
+            var contentArea = new GameObject("ContentArea");
+            contentArea.transform.SetParent(root.transform, false);
+            var contentRt = contentArea.AddComponent<RectTransform>();
+            contentRt.anchorMin = Vector2.zero;
+            contentRt.anchorMax = new Vector2(1, 0.9f);
+            contentRt.offsetMin = Vector2.zero;
+            contentRt.offsetMax = Vector2.zero;
+
+            Color[] panelColors = {
+                new Color(0.2f, 0.3f, 0.4f),
+                new Color(0.3f, 0.2f, 0.3f),
+                new Color(0.2f, 0.4f, 0.2f),
+                new Color(0.4f, 0.3f, 0.2f),
+                new Color(0.3f, 0.2f, 0.2f)
+            };
+
+            var panels = new GameObject[5];
+            for (int i = 0; i < 5; i++)
+            {
+                panels[i] = CreateUIChild(contentArea.transform, "Panel" + (i + 1),
+                    Vector2.zero, Vector2.one, panelColors[i]);
+                CreateTMPChild(panels[i].transform, "ContentText",
+                    "Panel " + (i + 1) + " Content", 36,
+                    Vector2.zero, Vector2.one, TextAlignmentOptions.Center);
+                panels[i].SetActive(i == 0);
+            }
+
+            // Wire TabController serialized fields
+            if (tabController != null)
+            {
+                var so = new SerializedObject(tabController);
+
+                var btnProp = so.FindProperty("tabButtons");
+                if (btnProp != null)
+                {
+                    btnProp.arraySize = 5;
+                    for (int i = 0; i < 5; i++)
+                        btnProp.GetArrayElementAtIndex(i).objectReferenceValue = buttons[i];
+                }
+
+                var panelProp = so.FindProperty("tabPanels");
+                if (panelProp != null)
+                {
+                    panelProp.arraySize = 5;
+                    for (int i = 0; i < 5; i++)
+                        panelProp.GetArrayElementAtIndex(i).objectReferenceValue = panels[i];
+                }
+
+                so.ApplyModifiedPropertiesWithoutUndo();
+
+                // Wire persistent onClick listeners
+                var selectTab = tabControllerType.GetMethod("SelectTab",
+                    BindingFlags.Public | BindingFlags.Instance);
+                if (selectTab != null)
+                {
+                    for (int i = 0; i < 5; i++)
+                    {
+                        var action = (UnityEngine.Events.UnityAction<int>)
+                            Delegate.CreateDelegate(
+                                typeof(UnityEngine.Events.UnityAction<int>),
+                                tabController, selectTab);
+                        UnityEditor.Events.UnityEventTools.AddIntPersistentListener(
+                            buttons[i].onClick, action, i);
+                    }
+                }
+            }
+
+            SavePrefab(root, path);
         }
 
         // ----------------------------------------------------------------

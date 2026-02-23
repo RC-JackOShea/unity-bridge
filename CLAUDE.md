@@ -37,6 +37,8 @@ Script location: `.agent/tools/unity_bridge.sh`
 | `input pinch` | `CX CY SD ED [duration]` | Pinch gesture |
 | `input multi_tap` | `X Y [count] [interval]` | Multi-tap |
 | `execute` | `<Method> [argsJson]` | Invoke a static C# method via reflection |
+| `integration_test` | `<test_file.json>` | Run single integration test (compile+play lifecycle) |
+| `integration_suite` | `<test_directory>` | Run all integration tests in directory |
 
 ## Execute Endpoint
 
@@ -167,6 +169,9 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 |------|-------------|-----|
 | `GameStateObserver` | `GetState`, `ObserveField` | [game-state-observer.md](.agent/docs/tools/game-state-observer.md) |
 | `PlayModeInteractor` | `RunSequence` | [play-mode-interactor.md](.agent/docs/tools/play-mode-interactor.md) |
+| `PlayModeUIScanner` | `ScanUI`, `FindElement`, `GetInteractables` | Runtime UI discovery with screen positions |
+| `IntegrationTestRunner` | `RunTest`, `RunSuite`, `ListTests`, `RunByTag` | [integration-testing.md](.agent/docs/guides/integration-testing.md) |
+| `IntegrationTestWriter` | `SaveTest`, `ValidateTest` | Validate and save integration test files |
 
 ### Build & Package
 

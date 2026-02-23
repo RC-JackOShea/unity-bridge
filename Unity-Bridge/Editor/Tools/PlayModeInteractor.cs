@@ -17,8 +17,8 @@ namespace UnityBridge
     /// </summary>
     public static class PlayModeInteractor
     {
-        private static List<string> capturedLogs = new List<string>();
-        private static bool logCallbackRegistered = false;
+        internal static List<string> capturedLogs = new List<string>();
+        internal static bool logCallbackRegistered = false;
 
         public static string RunSequence(string jsonScript)
         {
@@ -114,7 +114,7 @@ namespace UnityBridge
             }
         }
 
-        private static string ExecuteAction(SimpleJson.JsonNode action, string actionType, List<string> screenshots)
+        internal static string ExecuteAction(SimpleJson.JsonNode action, string actionType, List<string> screenshots)
         {
             switch (actionType)
             {

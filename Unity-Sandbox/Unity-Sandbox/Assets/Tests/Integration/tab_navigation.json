@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "name": "Navigate all 5 tabs",
+  "description": "Clicks through all 5 tabs with 1-second pauses, verifies each panel activates and tab highlights",
+  "tags": ["tabs", "navigation", "smoke"],
+  "setup": {
+    "clearLogs": true,
+    "waitAfterPlay": 1.0
+  },
+  "actions": [
+    { "type": "scan_ui", "comment": "Discover UI layout" },
+
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel1", "expected": true },
+    { "type": "screenshot", "path": "C:/temp/tests/tab1_initial.png" },
+
+    { "type": "tap_element", "path": "UICanvas/TabSystem/TabBar/Tab2" },
+    { "type": "wait_seconds", "duration": 1.0 },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel2", "expected": true },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel1", "expected": false },
+    { "type": "screenshot", "path": "C:/temp/tests/tab2.png" },
+
+    { "type": "tap_element", "path": "UICanvas/TabSystem/TabBar/Tab3" },
+    { "type": "wait_seconds", "duration": 1.0 },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel3", "expected": true },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel2", "expected": false },
+    { "type": "screenshot", "path": "C:/temp/tests/tab3.png" },
+
+    { "type": "tap_element", "path": "UICanvas/TabSystem/TabBar/Tab4" },
+    { "type": "wait_seconds", "duration": 1.0 },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel4", "expected": true },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel3", "expected": false },
+    { "type": "screenshot", "path": "C:/temp/tests/tab4.png" },
+
+    { "type": "tap_element", "path": "UICanvas/TabSystem/TabBar/Tab5" },
+    { "type": "wait_seconds", "duration": 1.0 },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel5", "expected": true },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel4", "expected": false },
+    { "type": "screenshot", "path": "C:/temp/tests/tab5.png" }
+  ],
+  "teardown": {
+    "screenshotOnFailure": true,
+    "failurePath": "C:/temp/tests/failures/"
+  }
+}

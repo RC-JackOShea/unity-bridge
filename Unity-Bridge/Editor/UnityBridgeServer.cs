@@ -1065,7 +1065,7 @@ namespace UnityBridge
                     }
 
                     // Execute on main thread
-                    resultJson = QueueUnityAction(() => MethodExecutor.Execute(req.method, argsJson));
+                    resultJson = QueueUnityAction(() => MethodExecutor.Execute(req.method, argsJson), 120000);
 
                     if (resultJson == null)
                         resultJson = "{\"success\":false,\"error\":\"Null result from executor\"}";

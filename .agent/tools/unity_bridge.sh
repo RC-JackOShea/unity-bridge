@@ -514,9 +514,40 @@ case "$1" in
     "execute")
         check_server && execute_method "$2" "$3"
         ;;
+    "integration_test")
+        # Run a single integration test file
+        # Orchestrates: compile → play enter → execute RunTest → play exit
+        test_file="$2"
+        if [ -z "$test_file" ]; then
+            echo "Usage: $0 integration_test <test_file.json>"
+            exit 1
+        fi
+        check_server || exit 1
+        compile || exit 1
+        play_mode "enter" || exit 1
+        # Brief wait for Play Mode to stabilize
+        sleep 1
+        execute_method "UnityBridge.IntegrationTestRunner.RunTest" "[\"$test_file\"]"
+        play_mode "exit"
+        ;;
+    "integration_suite")
+        # Run all integration tests in a directory
+        # Orchestrates: compile → play enter → execute RunSuite → play exit
+        test_dir="$2"
+        if [ -z "$test_dir" ]; then
+            echo "Usage: $0 integration_suite <test_directory>"
+            exit 1
+        fi
+        check_server || exit 1
+        compile || exit 1
+        play_mode "enter" || exit 1
+        sleep 1
+        execute_method "UnityBridge.IntegrationTestRunner.RunSuite" "[\"$test_dir\"]"
+        play_mode "exit"
+        ;;
     *)
         echo "Unity Bridge Script"
-        echo "Usage: $0 {compile|logs|status|clear|health|play|screenshot|input|execute}"
+        echo "Usage: $0 {compile|logs|status|clear|health|play|screenshot|input|execute|integration_test|integration_suite}"
         echo ""
         echo "Commands:"
         echo "  compile              - Trigger Unity compilation and get results"
@@ -533,6 +564,8 @@ case "$1" in
         echo "  input pinch CX CY SD ED [dur] - Emulate pinch gesture"
         echo "  input multi_tap X Y [count] [interval] - Emulate multi-tap"
         echo "  execute <Method> [args] - Execute static method via reflection"
+        echo "  integration_test <file> - Run single integration test (compile+play lifecycle)"
+        echo "  integration_suite <dir> - Run all integration tests in directory"
         echo ""
         echo "Example: $0 play enter"
         echo "Example: $0 screenshot C:/temp/test.png"
@@ -540,6 +573,8 @@ case "$1" in
         echo "Example: $0 input multi_tap 500 300 3"
         echo "Example: $0 execute UnityBridge.BridgeTools.Ping"
         echo "Example: $0 execute UnityBridge.BridgeTools.Add '[1,2]'"
+        echo "Example: $0 integration_test Assets/Tests/Integration/test.json"
+        echo "Example: $0 integration_suite Assets/Tests/Integration"
         exit 1
         ;;
 esac
