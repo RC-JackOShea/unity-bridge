@@ -158,12 +158,19 @@ namespace UnityBridge
             public string status;
             public string message;
             public object data;
+            /// <summary>When set, this pre-serialized JSON is embedded directly as the "data" field.</summary>
+            [NonSerialized] public string rawDataJson;
 
             public string ToJson()
             {
                 var jsonString = $"{{\"status\":\"{status}\",\"message\":\"{EscapeJsonString(message)}\"";
 
-                if (data != null)
+                if (!string.IsNullOrEmpty(rawDataJson))
+                {
+                    // Embed pre-serialized JSON directly (no escaping)
+                    jsonString += $",\"data\":{rawDataJson}";
+                }
+                else if (data != null)
                 {
                     string dataJson;
                     if (data is string)
@@ -194,11 +201,13 @@ namespace UnityBridge
                 return jsonString;
             }
 
-            private string EscapeJsonString(string str)
-            {
-                if (str == null) return "";
-                return str.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
-            }
+        }
+
+        /// <summary>Escape a string for safe embedding in JSON.</summary>
+        private static string EscapeJsonString(string str)
+        {
+            if (str == null) return "";
+            return str.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
         }
 
         static UnityBridgeServer()
@@ -756,20 +765,42 @@ namespace UnityBridge
         {
             lock (lockObject)
             {
-                var statusData = new {
-                    isCompiling = isCompiling,
-                    logCount = logs.Count,
-                    compilationHistory = compilationHistory.ToArray(),
-                    currentCompilation = currentCompilation,
-                    serverRunning = isRunning,
-                    timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
-                };
+                // Build JSON manually because JsonUtility cannot serialize anonymous types
+                var historyEntries = new List<string>();
+                foreach (var entry in compilationHistory)
+                {
+                    var errArr = new List<string>();
+                    if (entry.errors != null)
+                        foreach (var e in entry.errors) errArr.Add("\"" + EscapeJsonString(e) + "\"");
+                    var warnArr = new List<string>();
+                    if (entry.warnings != null)
+                        foreach (var w in entry.warnings) warnArr.Add("\"" + EscapeJsonString(w) + "\"");
 
+                    historyEntries.Add(string.Format(
+                        "{{\"status\":\"{0}\",\"success\":{1},\"errors\":[{2}],\"warnings\":[{3}],\"startTime\":\"{4}\",\"endTime\":\"{5}\",\"duration\":{6}}}",
+                        EscapeJsonString(entry.status ?? ""),
+                        entry.success ? "true" : "false",
+                        string.Join(",", errArr.ToArray()),
+                        string.Join(",", warnArr.ToArray()),
+                        EscapeJsonString(entry.startTime ?? ""),
+                        EscapeJsonString(entry.endTime ?? ""),
+                        entry.duration.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)));
+                }
+
+                string statusJson = string.Format(
+                    "{{\"isCompiling\":{0},\"logCount\":{1},\"compilationHistory\":[{2}],\"serverRunning\":{3},\"timestamp\":\"{4}\"}}",
+                    isCompiling ? "true" : "false",
+                    logs.Count,
+                    string.Join(",", historyEntries.ToArray()),
+                    isRunning ? "true" : "false",
+                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"));
+
+                // Return as a raw JSON string so ToJson() embeds it directly
                 return new ApiResponse
                 {
                     status = "success",
                     message = $"Status retrieved - {logs.Count} logs, compiling: {isCompiling}",
-                    data = statusData
+                    rawDataJson = statusJson
                 };
             }
         }

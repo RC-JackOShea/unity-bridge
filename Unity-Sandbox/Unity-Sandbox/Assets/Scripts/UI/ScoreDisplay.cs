@@ -13,6 +13,7 @@ namespace Game.UI
 
         private object tmpComponent;
         private System.Reflection.PropertyInfo textProperty;
+        private bool subscribed;
 
         private void Awake()
         {
@@ -39,16 +40,39 @@ namespace Game.UI
             UpdateDisplay(0);
         }
 
+        // Start runs after all AddComponent + reflection field injection is complete,
+        // so scoreManager is guaranteed to be set by this point.
+        private void Start()
+        {
+            Subscribe();
+        }
+
         private void OnEnable()
         {
-            if (scoreManager != null)
-                scoreManager.onScoreChanged += UpdateDisplay;
+            Subscribe();
         }
 
         private void OnDisable()
         {
-            if (scoreManager != null)
+            Unsubscribe();
+        }
+
+        private void Subscribe()
+        {
+            if (!subscribed && scoreManager != null)
+            {
+                scoreManager.onScoreChanged += UpdateDisplay;
+                subscribed = true;
+            }
+        }
+
+        private void Unsubscribe()
+        {
+            if (subscribed && scoreManager != null)
+            {
                 scoreManager.onScoreChanged -= UpdateDisplay;
+                subscribed = false;
+            }
         }
 
         private void UpdateDisplay(int score)

@@ -33,19 +33,5 @@ namespace Game.Score
         {
             currentScore = 0;
         }
-
-        /// <summary>
-        /// Static accessor for bridge-driven testing.
-        /// Finds the first ScoreManager asset loaded at runtime.
-        /// </summary>
-        public static string GetScoreState()
-        {
-            var managers = Resources.FindObjectsOfTypeAll<ScoreManager>();
-            if (managers.Length == 0)
-                return "{\"success\":false,\"error\":\"No ScoreManager instance found\"}";
-
-            var mgr = managers[0];
-            return string.Format("{{\"success\":true,\"currentScore\":{0}}}", mgr.currentScore);
-        }
     }
 }

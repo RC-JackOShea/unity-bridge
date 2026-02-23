@@ -185,6 +185,35 @@ bash .agent/tools/unity_bridge.sh play exit
 # Read output
 ```
 
+### Visual Verification
+Required for any challenge that creates or modifies anything visible:
+
+1. Enter Play Mode (after compiling)
+2. Take a screenshot: `bash .agent/tools/unity_bridge.sh screenshot C:/temp/verify_XX.png`
+3. Read the PNG with the Read tool — visually inspect it
+4. Check for: magenta/pink objects (shader failure), missing UI elements, incorrect positioning, black/blank render
+5. If using ScreenSpaceOverlay canvas: UI won't appear in screenshots — verify via `execute` calls instead (e.g., read text content, check component existence)
+
+### Runtime Behavior Verification
+Required for any challenge that creates behavior (triggers, state changes, scoring, input handling):
+
+1. Write a bridge-callable test method in `Assets/Scripts/BridgeTests/<Feature>Tests.cs`
+   - Namespace: `Game.BridgeTests`, class: `public static class <Feature>Tests`
+   - Methods return JSON strings with `success`, expected values, and diagnostics
+2. Call via `execute Game.BridgeTests.<Class>.<Method>`
+3. Parse the JSON response — verify `actual == expected` for every field
+4. Run multi-cycle tests where applicable (not just a single invocation) to catch state accumulation bugs
+5. Verify state changes, event delivery, and object lifecycle (created, active, destroyed as expected)
+
+### Failure Mode Scan
+Mandatory checklist before declaring all criteria passed:
+
+- Run `logs`, search output for "Error", "Exception", "NullReference" — fix any found
+- If a material was created via code: verify `Shader.Find()` returned non-null, or reuse existing primitive materials
+- If event subscription exists: verify the subscriber received at least one event (check via execute call)
+- If `Destroy()` is called: verify the object is gone on a subsequent check (use `SetActive(false)` first for same-frame removal)
+- If UI was created: verify text/content has the expected value via execute call (don't rely solely on screenshots for overlay canvases)
+
 ### Handle Failures
 If any criterion fails:
 1. Diagnose the root cause

@@ -1,0 +1,6 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <ui:VisualElement name="root" class="container">
+        <ui:Label name="title" text="Menu" />
+        <ui:Button name="play-btn" class="primary-btn" text="Play" />
+    </ui:VisualElement>
+</ui:UXML>

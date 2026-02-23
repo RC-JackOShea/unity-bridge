@@ -10,27 +10,54 @@ namespace Game.Score
     /// </summary>
     public class ScoreSystemSetup : MonoBehaviour
     {
+        private static ScoreManager runtimeManager;
+        private static GameObject triggerZone;
+
+        /// <summary>Accessor for bridge test harnesses. Game code should not use this.</summary>
+        public static ScoreManager RuntimeManager => runtimeManager;
+
+        private static readonly Vector3 TriggerPosition = new Vector3(3, 0.5f, 3);
+        private static readonly Vector3 SafePosition = new Vector3(0, 1f, 0);
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Setup()
         {
-            // Create ScoreManager instance
-            var scoreManager = ScriptableObject.CreateInstance<ScoreManager>();
-            scoreManager.name = "RuntimeScoreManager";
+            try
+            {
+                runtimeManager = ScriptableObject.CreateInstance<ScoreManager>();
+                runtimeManager.name = "RuntimeScoreManager";
 
-            // Create score HUD
-            CreateScoreHUD(scoreManager);
+                CreateScoreHUD(runtimeManager);
+                triggerZone = CreateScoreTrigger(runtimeManager, TriggerPosition, 1, 10);
+                CreateTestPlayer();
 
-            // Create an example trigger zone
-            CreateScoreTrigger(scoreManager, new Vector3(3, 0.5f, 3), 10);
+                Debug.Log("[ScoreSystem] Setup complete");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("[ScoreSystem] Setup failed: " + e.Message + "\n" + e.StackTrace);
+            }
+        }
 
-#if UNITY_EDITOR
-            Debug.Log("[ScoreSystem] Setup complete");
-#endif
+        private static void CreateTestPlayer()
+        {
+            var player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            player.name = "TestPlayer";
+            player.transform.position = SafePosition;
+
+            try { player.tag = "Player"; }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("[ScoreSystem] Could not set Player tag: " + e.Message);
+            }
+
+            var rb = player.AddComponent<Rigidbody>();
+            rb.useGravity = true;
+            rb.constraints = RigidbodyConstraints.FreezeRotation;
         }
 
         private static void CreateScoreHUD(ScoreManager manager)
         {
-            // Find or create Canvas
             var existingCanvas = Object.FindObjectOfType<Canvas>();
             Canvas canvas;
             if (existingCanvas != null)
@@ -47,7 +74,6 @@ namespace Game.Score
                 canvasGo.AddComponent<GraphicRaycaster>();
             }
 
-            // Create score text in top-right
             var scoreGo = new GameObject("ScoreDisplay");
             scoreGo.transform.SetParent(canvas.transform, false);
 
@@ -57,7 +83,6 @@ namespace Game.Score
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
 
-            // Add text component (TMP preferred)
             var tmpType = FindType("TMPro.TextMeshProUGUI");
             if (tmpType != null)
             {
@@ -89,14 +114,12 @@ namespace Game.Score
                 text.font = Font.CreateDynamicFontFromOSFont("Arial", 36);
             }
 
-            // Add ScoreDisplay component and wire it
             var display = scoreGo.AddComponent<Game.UI.ScoreDisplay>();
             var smField = typeof(Game.UI.ScoreDisplay).GetField("scoreManager",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             if (smField != null)
                 smField.SetValue(display, manager);
 
-            // Ensure EventSystem
             if (EventSystem.current == null)
             {
                 var esGo = new GameObject("EventSystem");
@@ -109,32 +132,25 @@ namespace Game.Score
             }
         }
 
-        private static void CreateScoreTrigger(ScoreManager manager, Vector3 position, int points)
+        private static GameObject CreateScoreTrigger(ScoreManager manager, Vector3 position, int points, int maxUses)
         {
             var go = new GameObject("ScoreTriggerZone");
             go.transform.position = position;
 
-            // Visual indicator
             var visual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             visual.transform.SetParent(go.transform, false);
             visual.transform.localScale = Vector3.one * 0.8f;
             var renderer = visual.GetComponent<Renderer>();
             if (renderer != null)
-            {
-                renderer.material = new Material(Shader.Find("Standard"));
                 renderer.material.color = new Color(1f, 0.84f, 0f); // Gold
-                renderer.material.SetFloat("_Metallic", 0.8f);
-            }
-            // Remove the sphere's own collider (we use the parent's trigger collider)
+
             var sphereCollider = visual.GetComponent<Collider>();
             if (sphereCollider != null) Object.Destroy(sphereCollider);
 
-            // Trigger collider on parent
             var boxCollider = go.AddComponent<BoxCollider>();
             boxCollider.isTrigger = true;
             boxCollider.size = Vector3.one * 1.5f;
 
-            // ScoreTrigger component
             var trigger = go.AddComponent<ScoreTrigger>();
             var smField = typeof(ScoreTrigger).GetField("scoreManager",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -144,6 +160,12 @@ namespace Game.Score
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             if (pvField != null)
                 pvField.SetValue(trigger, points);
+            var muField = typeof(ScoreTrigger).GetField("maxUses",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (muField != null)
+                muField.SetValue(trigger, maxUses);
+
+            return go;
         }
 
         private static System.Type FindType(string fullName)

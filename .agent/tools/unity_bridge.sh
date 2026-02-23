@@ -51,44 +51,72 @@ check_server() {
     fi
 }
 
+# Helper: extract compilation errors from a /status JSON response.
+# Prints each error line and returns 0 if errors found, 1 if clean.
+check_compile_errors() {
+    local status_json="$1"
+    local errors=""
+
+    if command -v jq >/dev/null 2>&1; then
+        errors=$(echo "$status_json" | jq -r '
+            .data.compilationHistory // [] | .[-1:] | .[].errors // [] | .[]' 2>/dev/null)
+    else
+        # Fallback: grep for error strings inside compilationHistory
+        errors=$(echo "$status_json" | grep -oP '"errors":\["[^]]*"\]' | grep -oP '(?<=")[^"]+error[^"]+(?=")' )
+    fi
+
+    if [ -n "$errors" ]; then
+        echo "✗ Compilation errors detected:"
+        echo "$errors" | while IFS= read -r line; do
+            [ -n "$line" ] && echo "  ERROR: $line"
+        done
+        return 0  # errors found
+    fi
+    return 1  # no errors
+}
+
 # Function to trigger compilation
 compile() {
     echo "Triggering Unity compilation..."
     response=$(make_request "/compile" "POST" "{}")
-    
+
     # Extract JSON response
     clean_response=$(echo "$response" | grep '^{.*}' | head -1 | tr -d '\r')
-    
+
     if [ -n "$clean_response" ]; then
         status=$(echo "$clean_response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-        
+
         if [ "$status" = "started" ]; then
             echo "✓ Compilation started successfully"
             echo "Waiting for compilation to complete..."
-            
+
             # Poll for completion (up to 2 minutes)
             max_attempts=24  # 24 * 5 seconds = 2 minutes
             attempt=0
-            
+            last_status=""
+
             while [ $attempt -lt $max_attempts ]; do
                 sleep 5
                 status_response=$(make_request "/status" "GET")
-                status_clean=$(echo "$status_response" | grep '^{.*}' | head -1 | tr -d '\r')
-                
-                if echo "$status_clean" | grep -q 'compiling.*False\|"isCompiling":false'; then
-                    echo "✓ Compilation completed"
-                    if command -v jq >/dev/null 2>&1; then
-                        echo "$status_clean" | jq '.'
-                    else
-                        echo "$status_clean"
+                last_status=$(echo "$status_response" | grep '^{.*}' | head -1 | tr -d '\r')
+
+                if echo "$last_status" | grep -q 'compiling.*False\|"isCompiling":false'; then
+                    # Compilation finished — now check for errors
+                    if check_compile_errors "$last_status"; then
+                        echo ""
+                        echo "$last_status"
+                        return 1
                     fi
+
+                    echo "✓ Compilation completed (no errors)"
+                    echo "$last_status"
                     return 0
                 fi
-                
+
                 echo "  Still compiling... (attempt $((attempt + 1))/$max_attempts)"
                 attempt=$((attempt + 1))
             done
-            
+
             echo "⚠ Compilation timeout - check Unity Editor for status"
             return 1
         else
@@ -188,6 +216,17 @@ play_mode() {
             return 1
         fi
     else
+        # Pre-flight: if entering play mode, check for compile errors first
+        if [ "$action" = "enter" ]; then
+            preflight=$(make_request "/status" "GET")
+            preflight_clean=$(echo "$preflight" | grep '^{.*}' | head -1 | tr -d '\r')
+            if check_compile_errors "$preflight_clean"; then
+                echo "✗ Refusing to enter Play Mode — unresolved compilation errors."
+                echo "  Fix the errors above and run 'compile' before entering Play Mode."
+                return 1
+            fi
+        fi
+
         # POST - enter or exit
         echo "Setting Play Mode: $action..."
         response=$(make_request "/playmode" "POST" "{\"action\":\"$action\"}")
