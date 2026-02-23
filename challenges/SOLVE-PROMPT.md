@@ -7,7 +7,7 @@
 ## Prompt (copy from here)
 
 ```
-You are solving Challenge XX of the Unity Bridge Lights-Out series. The challenge folder is `challenges/XX-CHALLENGE-NAME/`. Your mission is to fully implement every requirement, pass every success criterion, complete the outro checklist, and produce a clean git history — all using the full Claude Code feature set: sub-agents, teams, task tracking, plan mode, parallel tool calls, and git worktrees where appropriate.
+You are solving Challenge XX. The challenge folder is `challenges/XX-CHALLENGE-NAME/`. Your mission is to fully implement every requirement, pass every success criterion, complete the outro checklist, and produce a clean git history — all using the full Claude Code feature set: sub-agents, teams, task tracking, plan mode, parallel tool calls, and git worktrees where appropriate.
 
 IMPORTANT: All Unity interactions MUST go through the bridge script using the mandatory two-step pattern:
 1. Run: `bash .agent/tools/unity_bridge.sh <command> [args]`
@@ -134,6 +134,9 @@ Execute the plan. For each task:
   - `challenge-01: add execute command to unity_bridge.sh`
   - `challenge-01: update CLAUDE.md with execute command docs`
 
+### Prefab-First Rule
+When a challenge requires visible game objects or UI, create prefabs via bridge tools (PrefabCreator, UIBuilder, or project-specific setup tools documented in PROJECT.md) and place prefab instances directly in the scene — no `[RuntimeInitializeOnLoadMethod]`, no bootstrap scripts, no runtime instantiation. Use the project-specific scene setup tool (see PROJECT.md) to place prefabs into the scene.
+
 ### Compilation Rules (Mandatory)
 You MUST compile after:
 - Creating any `.cs` file
@@ -198,9 +201,9 @@ Required for any challenge that creates or modifies anything visible:
 Required for any challenge that creates behavior (triggers, state changes, scoring, input handling):
 
 1. Write a bridge-callable test method in `Assets/Scripts/BridgeTests/<Feature>Tests.cs`
-   - Namespace: `Game.BridgeTests`, class: `public static class <Feature>Tests`
+   - Namespace: `<ProjectNamespace>.BridgeTests`, class: `public static class <Feature>Tests` (see PROJECT.md for project namespace)
    - Methods return JSON strings with `success`, expected values, and diagnostics
-2. Call via `execute Game.BridgeTests.<Class>.<Method>`
+2. Call via `execute <ProjectNamespace>.BridgeTests.<Class>.<Method>`
 3. Parse the JSON response — verify `actual == expected` for every field
 4. Run multi-cycle tests where applicable (not just a single invocation) to catch state accumulation bugs
 5. Verify state changes, event delivery, and object lifecycle (created, active, destroyed as expected)

@@ -1,39 +1,23 @@
 # Unity Bridge — Agent Instructions
 
+## Project-Specific Configuration
+
+Before working with project-specific assets, scenes, or setup tools, read the `PROJECT.md` file in the Unity project root. It contains the project's namespace, scene paths, prefab inventory, setup tool commands, and test harnesses.
+
+**Template for new projects:** `Unity-Bridge/PROJECT-TEMPLATE.md`
+
 ## Unity Interaction Protocol
 
 **ALL Unity interactions MUST go through the bridge script.** Never use raw `curl` to `localhost:5556`. Never bypass the script for any reason.
 
 Script location: `.agent/tools/unity_bridge.sh`
 
-## How to Invoke
-
-```bash
-bash .agent/tools/unity_bridge.sh <command> [args]
-```
-
-## How to Read Output
-
-The bridge script redirects all output to a file because the Claude Code Bash tool on Windows swallows `echo` stdout — agents see nothing from direct execution.
-
-After **every** invocation, read the output file:
-
-```
-C:/temp/unity_bridge_output.txt
-```
-
-Use the **Read** tool (not `cat`) to read this file.
-
 ## Two-Step Pattern (Mandatory)
 
-1. **Step 1 — Run the command:**
-   ```bash
-   bash .agent/tools/unity_bridge.sh health
-   ```
-2. **Step 2 — Read the output file:**
-   Use the Read tool on `C:/temp/unity_bridge_output.txt`
+1. **Run the command:** `bash .agent/tools/unity_bridge.sh <command> [args]`
+2. **Read the output:** Use the Read tool on `C:/temp/unity_bridge_output.txt`
 
-**Never skip Step 2.** The Bash tool return value will be empty or incomplete.
+**Never skip Step 2.** The Bash tool return value will be empty or incomplete. The output file is overwritten on each invocation — read it immediately after each command.
 
 ## Available Commands
 
@@ -56,161 +40,15 @@ Use the **Read** tool (not `cat`) to read this file.
 
 ## Execute Endpoint
 
-The `/execute` endpoint invokes any static C# method by fully-qualified name via reflection. This is the foundation for all tool methods — new tools are added as static methods in `BridgeTools.cs` (or any class), callable without modifying the server or script.
+Invokes any static C# method by fully-qualified name via reflection. New tools are added as static methods in any class — no server or script modifications needed.
 
-### Usage
+**Before using execute extensively, read:** `.agent/docs/tools/execute-endpoint.md`
 
-```bash
-bash .agent/tools/unity_bridge.sh execute <Namespace.Class.Method> [argsJson]
-```
+## Input Events
 
-### JSON Request/Response Format
+Input coordinates are screen pixels with `(0,0)` at bottom-left. Tap/hold/multi-tap use `ExecuteEvents` for UI; drag/swipe/pinch use virtual `Touchscreen`. UI input requires: EventSystem, Canvas with GraphicRaycaster, raycastTarget=true, and an interactable component.
 
-**Request** (POST `/execute`):
-```json
-{"method": "UnityBridge.BridgeTools.Ping", "args": []}
-{"method": "UnityBridge.BridgeTools.Add", "args": ["1", "2"]}
-```
-
-The `args` array contains string representations of each argument. The executor converts them to the method's parameter types (int, float, string, bool, etc.).
-
-**Response** (returned directly, not wrapped in ApiResponse):
-```json
-{"success": true, "result": {"message": "pong", "timestamp": "2024-01-01T00:00:00Z"}}
-{"success": false, "error": "Type not found: Foo.Bar"}
-```
-
-Methods returning `string` are assumed to return valid JSON and are embedded directly in the `result` field. Methods returning `void` produce `"result": null`.
-
-### Examples
-
-```bash
-# Connectivity test
-bash .agent/tools/unity_bridge.sh execute UnityBridge.BridgeTools.Ping
-
-# Pass arguments
-bash .agent/tools/unity_bridge.sh execute UnityBridge.BridgeTools.Add '[1,2]'
-
-# Error case — nonexistent method
-bash .agent/tools/unity_bridge.sh execute Fake.Class.Method
-```
-
-### Security Note
-
-The execute endpoint can invoke **any** static method in any loaded assembly. This is by design for agent tooling but means the bridge should not be exposed to untrusted networks. Keep it on localhost only.
-
-## Input Events — Deep Reference
-
-### Coordinate System
-
-All input coordinates are **screen pixels** with `(0, 0)` at the **bottom-left** corner of the Game view. The top-right corner is `(Screen.width, Screen.height)`. These match Unity's screen coordinate convention.
-
-To find the Game view resolution while in Play Mode, use `screenshot` — the result reports `width` and `height`.
-
-### How Input Works Internally
-
-The InputEmulator uses **two different mechanisms** depending on the input type:
-
-#### Tap / Hold / Multi-tap → ExecuteEvents (UI-compatible)
-
-These actions use Unity's `ExecuteEvents` system to directly dispatch pointer events. This is the only reliable way to click UI elements from editor code.
-
-The sequence for a tap:
-1. Raycast into the UI at the given screen coordinates using `EventSystem.current.RaycastAll`
-2. If a UI element is hit, walk **up** the hierarchy with `ExecuteEvents.GetEventHandler<IPointerClickHandler>` to find the actual handler (e.g., a `Button` component on a parent object)
-3. Fire `pointerDown` → `pointerUp` → `pointerClick` on the resolved handler
-4. If no UI element is hit, fall back to queuing a mouse press/release via `InputSystem.QueueStateEvent` on `Mouse.current` (for non-UI game objects)
-
-#### Drag / Swipe / Pinch → Virtual Touchscreen
-
-Gesture inputs use a virtual `Touchscreen` device registered with the Input System. Touch events are queued via `InputSystem.QueueDeltaStateEvent` on individual touch slots (`virtualTouchscreen.touches[index]`). These are processed over multiple frames as the gesture interpolates from start to end.
-
-### Determining Tap Coordinates for UI Elements
-
-For a UI element anchored at the bottom-left with these RectTransform settings:
-- `anchorMin = (0, 0)`, `anchorMax = (0, 0)`, `pivot = (0, 0)`
-- `anchoredPosition = (20, 20)`, `sizeDelta = (200, 80)`
-
-The element spans from `(20, 20)` to `(220, 100)` in screen pixels. Its **center** is at `(120, 60)`. Tap that center point:
-
-```bash
-bash .agent/tools/unity_bridge.sh input tap 120 60
-```
-
-For elements with different anchoring, calculate the screen-space bounds from the anchor, pivot, anchoredPosition, and sizeDelta. When in doubt, take a `screenshot` and visually identify the element's position — but note the screenshot limitation below.
-
-### UI Requirements for Input to Work
-
-For `tap`, `hold`, and `multi_tap` to interact with UI elements, the scene **must** have:
-
-1. **EventSystem** — with `InputSystemUIInputModule` (not legacy `StandaloneInputModule`), since the bridge's InputEmulator is built on the new Input System
-2. **Canvas** — with a `GraphicRaycaster` component
-3. **Raycast target** — the UI element (or its `Image`/`Graphic` component) must have `raycastTarget = true` (this is the default)
-4. **Interactable component** — a `Button`, `Toggle`, or other `Selectable` that implements `IPointerClickHandler`
-
-If any of these are missing, the raycast will return no hit and the tap will fall through to the mouse fallback (which only affects non-UI objects).
-
-### Screenshot vs Overlay Canvas Trade-off
-
-The screenshot system captures via camera RenderTexture rendering. This means:
-
-- **ScreenSpaceCamera** canvases **are** captured in screenshots (the canvas is rendered by the camera)
-- **ScreenSpaceOverlay** canvases are **NOT** captured in screenshots (overlay is composited by Unity after camera rendering)
-
-However, `ScreenSpaceOverlay` is more reliable for input raycasting — the `EventSystem.RaycastAll` call consistently finds overlay elements regardless of camera setup.
-
-**Recommendation:** Use `ScreenSpaceOverlay` for UI that needs to receive input via the bridge. Accept that these elements won't appear in screenshots. If you need to verify UI visually, temporarily switch to `ScreenSpaceCamera` for the screenshot, then switch back.
-
-### Input Command Examples
-
-```bash
-# Tap the center of a button at screen position (120, 60)
-bash .agent/tools/unity_bridge.sh input tap 120 60
-
-# Long press at (500, 400) for 2 seconds
-bash .agent/tools/unity_bridge.sh input hold 500 400 2.0
-
-# Double-tap at (300, 300)
-bash .agent/tools/unity_bridge.sh input multi_tap 300 300 2
-
-# Drag from (100, 500) to (400, 500) over 0.5 seconds
-bash .agent/tools/unity_bridge.sh input drag 100 500 400 500 0.5
-
-# Swipe up from (500, 200) to (500, 800) over 0.3 seconds
-bash .agent/tools/unity_bridge.sh input swipe 500 200 500 800 0.3
-
-# Pinch at center (500, 500), starting distance 200, ending distance 50
-bash .agent/tools/unity_bridge.sh input pinch 500 500 200 50 0.5
-```
-
-### Full Example: Create and Click a UI Button
-
-```
-# 1. Edit code to create a button (e.g., via RuntimeInitializeOnLoadMethod)
-# 2. Compile
-bash .agent/tools/unity_bridge.sh compile
-# Read output — confirm compilation succeeded
-
-# 3. Enter Play Mode
-bash .agent/tools/unity_bridge.sh play enter
-# Read output — confirm play mode entered
-
-# 4. Clear logs so we only see new output
-bash .agent/tools/unity_bridge.sh clear
-# Read output
-
-# 5. Tap the button (coordinates from RectTransform calculation)
-bash .agent/tools/unity_bridge.sh input tap 120 60
-# Read output — confirm input enqueued
-
-# 6. Wait a moment, then check logs for the click handler output
-bash .agent/tools/unity_bridge.sh logs
-# Read output — look for the expected log message
-
-# 7. Exit Play Mode
-bash .agent/tools/unity_bridge.sh play exit
-# Read output
-```
+**Before using input commands, read:** `.agent/docs/tools/input-events.md`
 
 ## Mandatory Compilation Rules
 
@@ -220,9 +58,9 @@ Unity does not automatically compile when files change on disk. **You must expli
 
 You **MUST** run `compile` in all of the following situations:
 
-1. **After editing any C# file** — Every time you create, modify, or delete a `.cs` file (scripts, editors, ScriptableObjects, shaders with C# wrappers, assembly definitions), immediately compile before doing anything else in Unity.
+1. **After editing any C# file** — Every time you create, modify, or delete a `.cs` file, immediately compile before doing anything else in Unity.
 2. **Before entering Play Mode** — Always compile before `play enter`. Never enter Play Mode on stale code.
-3. **After exiting Play Mode if code was changed during play** — If you edited scripts while Play Mode was active, compile after `play exit` before re-entering.
+3. **After exiting Play Mode if code was changed during play** — Compile after `play exit` before re-entering.
 4. **After modifying assembly definitions** (`.asmdef` / `.asmref`) — These change compilation structure and require a fresh compile.
 5. **After adding/removing/moving script files** — File operations that change what Unity sees on disk require compilation.
 6. **Before running any test or validation step** — Ensure the code Unity is executing matches what is on disk.
@@ -239,102 +77,31 @@ bash .agent/tools/unity_bridge.sh compile
 bash .agent/tools/unity_bridge.sh play enter
 ```
 
-### What happens if you skip compilation
-
-- Unity runs **old code** that does not match the files on disk.
-- Bugs appear fixed in source but persist at runtime — extremely confusing.
-- New scripts or components are missing or throw `MissingReferenceException`.
-- Test results are meaningless because they test stale assemblies.
-
 **When in doubt, compile.** An unnecessary compile costs seconds. A skipped compile wastes entire debugging sessions.
 
 ## Agent Validation Protocol
 
-Before reporting any work as complete, agents **MUST** follow these verification steps. Skipping these steps has historically led to invisible failures that waste entire debugging sessions.
+Before reporting work as complete, agents must verify: clean compilation, no Play Mode errors, visual correctness via screenshot, runtime behavior via execute calls, and clean logs.
 
-### Mandatory Verification Steps
+**Before declaring work complete, read:** `.agent/docs/guides/validation-protocol.md`
 
-1. **Compile and confirm zero errors** — Read the compile output, explicitly search for "error". "Compilation started" is not enough — wait for "Compilation completed" with zero errors.
-2. **Enter Play Mode and check logs** — Immediately after `play enter`, run `logs` and search for `Exception`, `Error`, `NullReference`. Fix anything found before proceeding.
-3. **Take a screenshot after any visual change** — Use `screenshot C:/temp/verify.png`, then read the PNG with the Read tool. Inspect it for correctness.
-4. **Verify runtime behavior via bridge execute** — Call test methods, parse the JSON response, and confirm actual values match expected values. Do not assume correctness.
-5. **Check logs again after all interactions** — New errors may appear after input, physics simulation, or state changes.
-6. **Exit Play Mode before declaring complete** — Always clean up.
+## Prefab-First Asset Rules
 
-### Unity Failure Modes
+All game objects and UI must be authored as prefabs, not constructed at runtime. Materials are `.mat` assets, not runtime-created. Use TMPro directly. One ScreenSpace canvas per scene. See PROJECT.md for project-specific prefab paths and setup tools.
 
-These are common things that compile successfully but break at runtime. Check for all of them:
-
-| Failure | How to detect |
-|---------|---------------|
-| Magenta/pink materials | Screenshot shows pink objects. `Shader.Find()` returned null. Use the primitive's existing material or check `shader != null` before creating a material. |
-| Event subscription timing | `OnEnable()` fires before reflection-injected fields are set. Use `Start()` for late-bound fields. Verify by triggering the event and checking the subscriber reacted. |
-| `Destroy()` is deferred | Object still exists during the same frame / `Physics.Simulate()` call. Use `SetActive(false)` for immediate visual removal, then `Destroy()` for cleanup. |
-| ScreenSpaceOverlay invisible in screenshots | Camera RenderTexture capture skips overlay canvases. Verify UI existence via `execute` calls instead of screenshots. |
-| `[RuntimeInitializeOnLoadMethod]` on wrong target | Only valid on static **methods**, not fields or properties. Will cause a compile error that may be hard to spot in verbose output. |
-| `Shader.Find()` returns null at runtime | Shader not included in build or not loaded. Reuse `renderer.material` from primitives instead of creating new materials. |
-
-### Pre-Completion Checklist
-
-Before declaring work complete, verify every applicable item:
-
-- [ ] Compilation completed with zero errors (not just "started")
-- [ ] Play Mode entered without exceptions in logs
-- [ ] Screenshot taken and inspected (if visual changes were made)
-- [ ] No magenta/pink objects visible in screenshot
-- [ ] Runtime behavior tested via bridge execute (if logic changes were made)
-- [ ] Expected values match actual values in test output
-- [ ] Logs checked for errors after all interactions
-- [ ] Play Mode exited cleanly
+**Before creating game objects or UI, read:** `.agent/docs/guides/prefab-first-rules.md`
 
 ## Code Separation — Game vs Test Harness
 
-Game code and agent test infrastructure must be kept in separate directories so that agent tooling can be cleanly removed without affecting the game.
+Game code and agent test infrastructure live in separate directories. Test harnesses use `<ProjectNamespace>.BridgeTests` namespace (see PROJECT.md). Game code must never reference the BridgeTests namespace.
 
-### Convention
-
-- **Game code** → `Assets/Scripts/<Feature>/` — No bridge dependencies, no test methods, no `BridgeTests` references.
-- **Bridge test harnesses** → `Assets/Scripts/BridgeTests/<Feature>Tests.cs` — Agent-callable test methods only.
-
-### Test Harness Rules
-
-- Namespace: `Game.BridgeTests`
-- Class pattern: `public static class <Feature>Tests`
-- Method pattern: `public static string <Name>()` returning JSON
-- Each file header: `/// Delete this file to remove AI test infrastructure.`
-- **One-way dependency only**: test harnesses may reference game code, but game code must NEVER reference `Game.BridgeTests`.
-- Callable via: `execute Game.BridgeTests.<Class>.<Method>`
-
-### Example
-
-```csharp
-/// Delete this file to remove AI test infrastructure.
-namespace Game.BridgeTests
-{
-    public static class ScoreSystemTests
-    {
-        public static string GetScoreState() { /* ... */ }
-        public static string RunScoreTest() { /* ... */ }
-    }
-}
-```
+**Before creating test harnesses, read:** `.agent/docs/guides/code-separation.md`
 
 ## Typical Workflow
 
 ```
 health → [edit code] → compile → execute / play enter → screenshot → input → play exit → logs
 ```
-
-1. Check server is running (`health`)
-2. Edit code as needed
-3. **Compile** (`compile`) — mandatory after any code change
-4. **Compile again** if unsure — always safe, never harmful
-5. Enter Play Mode (`play enter`) — only after successful compilation
-6. Take screenshots to see the game state (`screenshot C:/temp/screen.png`)
-7. Send input to interact (`input tap 500 400`)
-8. Exit Play Mode when done (`play exit`)
-9. If code was edited during play, **compile** before re-entering
-10. Check logs for errors (`logs`)
 
 ## Rules
 
@@ -345,7 +112,6 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 - **Always** compile after editing any `.cs`, `.asmdef`, or `.asmref` file.
 - **Always** use the bridge script at `.agent/tools/unity_bridge.sh`.
 - **Always** read `C:/temp/unity_bridge_output.txt` after every invocation.
-- The output file is overwritten on each invocation — read it immediately after each command.
 
 ## Environment
 
@@ -354,42 +120,78 @@ health → [edit code] → compile → execute / play enter → screenshot → i
 - **Unity server:** `http://localhost:5556`
 - **Output file:** `C:/temp/unity_bridge_output.txt` (overridable via `UNITY_BRIDGE_OUTPUT` env var)
 
+## Bridge Tools Index
+
+### Core Infrastructure
+
+| Tool | Key Methods | Description |
+|------|-------------|-------------|
+| `BridgeTools` | `Ping`, `Add` | Connectivity test and basic operations |
+| `MethodExecutor` | — | Reflection-based method executor for /execute |
+
+### Scene & Asset Introspection
+
+| Tool | Key Methods | Doc |
+|------|-------------|-----|
+| `SceneInventoryTool` | `GetSceneHierarchy`, `FindByName` | Scene discovery and hierarchy extraction |
+| `ComponentDetailExtractor` | `GetComponentDetails` | Deep component property extraction |
+| `GUIDResolver` | `Resolve`, `ResolveAll` | GUID-to-asset-path resolution |
+| `PrefabInventoryTool` | `ListPrefabs`, `GetPrefabDetails` | Prefab discovery with variant detection |
+| `PrefabDetailExtractor` | `ExtractDetails` | Full prefab hierarchy with overrides |
+| `AssetInventoryTool` | `GetManifest`, `FindUnreferenced` | Asset manifest and dependency analysis |
+| `UIInventoryTool` | `ScanCanvases`, `GetUITree` | Canvas scanning and UI tree extraction |
+| `YAMLParser` | `Parse` | Unity YAML file parser for .prefab/.unity |
+
+### Creation & Modification
+
+| Tool | Key Methods | Doc |
+|------|-------------|-----|
+| `PrefabCreator` | `Create`, `Modify` | [prefab-creator.md](.agent/docs/tools/prefab-creator.md) |
+| `UIBuilder` | `Build` | [ui-builder.md](.agent/docs/tools/ui-builder.md) |
+| `CodeGenerator` | `Generate` | [code-generator.md](.agent/docs/tools/code-generator.md) |
+| `UIToolkitTools` | `ParseUXML`, `GenerateUXML` | UXML/USS parsing and generation |
+
+### Validation & Testing
+
+| Tool | Key Methods | Doc |
+|------|-------------|-----|
+| `PrefabValidator` | `Validate` | Prefab validation with configurable rules |
+| `VisualValidator` | `Validate` | [visual-validator.md](.agent/docs/tools/visual-validator.md) |
+| `ScreenshotValidator` | `Capture`, `Compare` | Multi-resolution capture and pixel comparison |
+| `TestRunner` | `RunTests`, `RunEditModeTests` | [test-runner.md](.agent/docs/tools/test-runner.md) |
+| `CodeReviewer` | `Review` | Regex-based static analysis |
+
+### Runtime & Play Mode
+
+| Tool | Key Methods | Doc |
+|------|-------------|-----|
+| `GameStateObserver` | `GetState`, `ObserveField` | [game-state-observer.md](.agent/docs/tools/game-state-observer.md) |
+| `PlayModeInteractor` | `RunSequence` | [play-mode-interactor.md](.agent/docs/tools/play-mode-interactor.md) |
+
+### Build & Package
+
+| Tool | Key Methods | Doc |
+|------|-------------|-----|
+| `BuildPipelineTool` | `GetConfig`, `Build` | [build-pipeline.md](.agent/docs/tools/build-pipeline.md) |
+| `BuildVerifier` | `Verify` | Build launch, monitoring, log analysis |
+| `PackageManagerTool` | `List`, `Install`, `Remove` | Package management operations |
+
+### Code Intelligence, Branding & Networking
+
+| Tool | Key Methods | Doc |
+|------|-------------|-----|
+| `CodebaseAnalyzer` | `Analyze`, `GetDependencies` | C# codebase analysis and conventions |
+| `DocFetcher` | `GetAPIDocs`, `Compare` | API docs via reflection, best practices |
+| `BrandSystem` | `Apply`, `Validate` | [brand-system.md](.agent/docs/tools/brand-system.md) |
+| `NetworkTestOrchestrator` | `Setup`, `RunTest` | Multi-instance network test orchestration |
+
 ## Project Structure
 
 | Path | Description |
 |------|-------------|
 | `.agent/tools/unity_bridge.sh` | Bridge script (the agent interface) |
-| `.agent/commands/unity/bridge.md` | Bridge discovery documentation |
-| `Unity-Bridge/Editor/UnityBridgeServer.cs` | HTTP server running inside Unity Editor |
-| `Unity-Bridge/Editor/UnityBridgeWindow.cs` | Editor window UI for the bridge |
-| `Unity-Bridge/Editor/InputEmulator.cs` | Input emulation handler |
-| `Unity-Bridge/Editor/ScreenshotCapture.cs` | Screenshot capture handler |
-| `Unity-Bridge/Editor/BridgeTools.cs` | Static tool methods (Ping, Add, future tools) |
-| `Unity-Bridge/Editor/MethodExecutor.cs` | Reflection-based method executor for /execute |
-| `Unity-Bridge/Editor/Tools/SceneInventoryTool.cs` | Scene discovery and hierarchy extraction |
-| `Unity-Bridge/Editor/Tools/ComponentDetailExtractor.cs` | Deep component property extraction via SerializedProperty |
-| `Unity-Bridge/Editor/Tools/GUIDResolver.cs` | GUID-to-asset-path resolution with lazy cache |
-| `Unity-Bridge/Editor/Tools/PrefabInventoryTool.cs` | Prefab discovery with variant/nested detection |
-| `Unity-Bridge/Editor/Tools/PrefabDetailExtractor.cs` | Full prefab hierarchy with properties and overrides |
-| `Unity-Bridge/Editor/Tools/AssetInventoryTool.cs` | Full asset manifest, dependencies, unreferenced detection |
-| `Unity-Bridge/Editor/Tools/UIInventoryTool.cs` | Canvas scanning, UI tree extraction with layout and interaction data |
-| `Unity-Bridge/Editor/Tools/PrefabCreator.cs` | Programmatic prefab creation and modification from JSON specs |
-| `Unity-Bridge/Editor/Tools/PrefabValidator.cs` | Prefab validation with configurable rules (missing scripts, broken refs, etc.) |
-| `Unity-Bridge/Editor/Tools/YAMLParser.cs` | Unity YAML file parser for .prefab and .unity files with class ID mapping |
-| `Unity-Bridge/Editor/Tools/UIToolkitTools.cs` | UXML/USS parsing, generation, and UI Toolkit asset discovery |
-| `Unity-Bridge/Editor/Tools/CodebaseAnalyzer.cs` | C# codebase analysis: classification, inheritance, dependencies, conventions |
-| `Unity-Bridge/Editor/Tools/BuildPipelineTool.cs` | Build configuration, execution, and report parsing |
-| `Unity-Bridge/Editor/Tools/PackageManagerTool.cs` | Package listing, install, remove, update, registry search |
-| `Unity-Bridge/Editor/Tools/GameStateObserver.cs` | Runtime game state inspection via reflection (Play Mode only) |
-| `Unity-Bridge/Editor/Tools/ScreenshotValidator.cs` | Multi-resolution screenshot capture and pixel-level comparison |
-| `Unity-Bridge/Editor/Tools/TestRunner.cs` | Test execution (Edit/Play Mode), NUnit result parsing, project validators |
-| `Unity-Bridge/Editor/Tools/PlayModeInteractor.cs` | Scripted Play Mode interaction sequences with state checks and screenshots |
-| `Unity-Bridge/Editor/Tools/CodeReviewer.cs` | Regex-based static analysis with 5 review categories and severity ranking |
-| `Unity-Bridge/Editor/Tools/CodeGenerator.cs` | Convention-aware C# code generation (MonoBehaviour, Editor, Test scripts) |
-| `Unity-Bridge/Editor/Tools/BuildVerifier.cs` | Build launch, process monitoring, log analysis, and verification reports |
-| `Unity-Bridge/Editor/Tools/DocFetcher.cs` | API docs via reflection, package docs, best practices, approach comparisons |
-| `Unity-Bridge/Editor/Tools/UIBuilder.cs` | JSON-driven UI hierarchy builder (Canvas, Button, Text, Slider, etc.) |
-| `Unity-Bridge/Editor/Tools/BrandSystem.cs` | Brand spec management, extraction, application, WCAG contrast validation |
-| `Unity-Bridge/Editor/Tools/VisualValidator.cs` | Rule-based visual validation: notBlank, dimensions, color diversity, baseline comparison, WCAG contrast |
-| `Unity-Bridge/Editor/Tools/NetworkTestOrchestrator.cs` | ParrelSync clone management, network framework detection, multi-instance test orchestration |
-| `Unity-Sandbox/.../Assets/Scripts/BridgeTests/` | Agent test harnesses (safe to delete) |
+| `.agent/docs/` | On-demand reference docs (`tools/`, `guides/`) |
+| `Unity-Bridge/Editor/` | Bridge package — server, input, screenshot, tools |
+| `Unity-Bridge/Editor/Tools/` | All bridge tools (see index above) |
+| `Unity-Bridge/PROJECT-TEMPLATE.md` | Template for project-specific configuration |
+| `<project-root>/PROJECT.md` | Per-project config (namespace, scenes, prefabs, setup tools) |
