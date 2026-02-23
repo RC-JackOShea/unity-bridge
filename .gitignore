@@ -11,6 +11,10 @@ ProjectSettings/
 UserSettings/
 Logs/
 
+# TextMesh Pro (auto-imported package assets)
+TextMesh Pro/
+TextMesh Pro.meta
+
 # Unity package manager
 manifest.json
 packages-lock.json
