@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -492,7 +493,6 @@ namespace UnityBridge
 
             float duration = action.Get("duration")?.AsFloat() ?? 0.1f;
             tapMethod.Invoke(null, new object[] { center.x, center.y, duration });
-            System.Threading.Thread.Sleep(200);
 
             return "Tapped element '" + path + "' at (" + center.x.ToString("F0") + ", " + center.y.ToString("F0") + ")";
         }
@@ -638,6 +638,309 @@ namespace UnityBridge
                 return "Screenshot matches baseline (diff=" + diffPercent.ToString("F4") + "%, threshold=" + threshold + "%)";
 
             return "FAIL:Screenshot differs from baseline (diff=" + diffPercent.ToString("F4") + "%, threshold=" + threshold + "%)";
+        }
+
+        // --- Coroutine-based async execution ---
+        // Runs one action per rendered frame via StartCoroutine on a MonoBehaviour.
+        // yield return null returns control to Unity's player loop, which renders
+        // the Game view before resuming the coroutine. No hacks needed.
+
+        /// <summary>
+        /// MonoBehaviour that owns test execution via StartCoroutine. Runs inside
+        /// the player loop so Unity renders between actions automatically.
+        /// </summary>
+        private class IntegrationTestBehaviour : MonoBehaviour
+        {
+            internal static IntegrationTestBehaviour ActiveInstance;
+
+            string testName, testFile;
+            List<SimpleJson.JsonNode> actions;
+            int actionIndex;
+            List<string> actionResults, screenshots, errors;
+            string overallResult, finalReport;
+            bool screenshotOnFailure;
+            string failurePath;
+            double totalStart;
+            bool running;
+            float waitAfterPlay;
+            bool previousRunInBackground;
+
+            void Awake()
+            {
+                if (ActiveInstance != null && ActiveInstance != this)
+                    DestroyImmediate(ActiveInstance.gameObject);
+                ActiveInstance = this;
+                DontDestroyOnLoad(gameObject);
+            }
+
+            void OnDestroy()
+            {
+                if (ActiveInstance == this)
+                    ActiveInstance = null;
+            }
+
+            internal void StartTest(SimpleJson.JsonNode test, string filePath)
+            {
+                testName = test.GetString("name") ?? "Unnamed";
+                testFile = filePath;
+
+                var actionsNode = test.Get("actions");
+                actions = actionsNode.arr;
+                actionIndex = 0;
+                actionResults = new List<string>();
+                screenshots = new List<string>();
+                errors = new List<string>();
+                overallResult = "Passed";
+                finalReport = null;
+                totalStart = EditorApplication.timeSinceStartup;
+
+                // Register log callback
+                if (!PlayModeInteractor.logCallbackRegistered)
+                {
+                    Application.logMessageReceived += OnLogReceived;
+                    PlayModeInteractor.logCallbackRegistered = true;
+                }
+
+                // Setup
+                var setup = test.Get("setup");
+                waitAfterPlay = 0f;
+                if (setup != null)
+                {
+                    bool clearLogs = setup.Get("clearLogs")?.AsBool() ?? false;
+                    if (clearLogs) PlayModeInteractor.capturedLogs.Clear();
+                    waitAfterPlay = setup.Get("waitAfterPlay")?.AsFloat() ?? 0f;
+                }
+
+                // Teardown config
+                var teardown = test.Get("teardown");
+                screenshotOnFailure = teardown?.Get("screenshotOnFailure")?.AsBool() ?? false;
+                failurePath = teardown?.GetString("failurePath") ?? "C:/temp/integration_test_failures/";
+
+                // Ensure player loop runs even when Unity loses focus
+                previousRunInBackground = Application.runInBackground;
+                Application.runInBackground = true;
+
+                running = true;
+                StartCoroutine(RunTestCoroutine());
+            }
+
+            internal string GetStatus()
+            {
+                if (running)
+                {
+                    return string.Format(CultureInfo.InvariantCulture,
+                        "{{\"success\":true,\"status\":\"running\",\"progress\":{0},\"total\":{1},\"name\":\"{2}\"}}",
+                        actionIndex, actions.Count, Esc(testName));
+                }
+
+                if (finalReport != null)
+                    return finalReport;
+
+                return "{\"success\":true,\"status\":\"idle\"}";
+            }
+
+            IEnumerator RunTestCoroutine()
+            {
+                // Initial wait after play mode
+                if (waitAfterPlay > 0f)
+                    yield return new WaitForSeconds(waitAfterPlay);
+
+                for (actionIndex = 0; actionIndex < actions.Count; actionIndex++)
+                {
+                    if (!EditorApplication.isPlaying)
+                    {
+                        overallResult = "Failed";
+                        errors.Add("Play Mode exited during test");
+                        break;
+                    }
+
+                    var action = actions[actionIndex];
+                    string actionType = action.GetString("type") ?? "";
+                    double actionStart = EditorApplication.timeSinceStartup;
+
+                    // Track yield type outside try-catch (C# forbids yield inside try-catch)
+                    float yieldWaitSeconds = -1f;
+                    int yieldWaitFrames = -1;
+                    bool shouldBreak = false;
+
+                    try
+                    {
+                        // wait_seconds — record result, defer yield
+                        if (actionType == "wait_seconds")
+                        {
+                            float dur = action.Get("duration")?.AsFloat() ?? 1.0f;
+                            actionResults.Add(string.Format(CultureInfo.InvariantCulture,
+                                "{{\"index\":{0},\"type\":\"wait_seconds\",\"result\":\"success\",\"duration\":{1:F3},\"details\":\"Waiting {1:F1}s\"}}",
+                                actionIndex, dur));
+                            yieldWaitSeconds = dur;
+                        }
+                        // wait_frames — record result, defer yield
+                        else if (actionType == "wait_frames")
+                        {
+                            int frames = (int)(action.Get("count")?.AsFloat() ?? 1);
+                            actionResults.Add(string.Format(CultureInfo.InvariantCulture,
+                                "{{\"index\":{0},\"type\":\"wait_frames\",\"result\":\"success\",\"duration\":0,\"details\":\"Waiting {1} frames\"}}",
+                                actionIndex, frames));
+                            yieldWaitFrames = frames;
+                        }
+                        else
+                        {
+                            string result;
+                            if (IsNewActionType(actionType))
+                                result = ExecuteNewAction(action, actionType, screenshots);
+                            else
+                                result = PlayModeInteractor.ExecuteAction(action, actionType, screenshots);
+
+                            double duration = EditorApplication.timeSinceStartup - actionStart;
+                            bool success = !result.StartsWith("FAIL:");
+                            string details = success ? result : result.Substring(5);
+
+                            if (!success)
+                            {
+                                overallResult = "Failed";
+                                errors.Add("Action " + actionIndex + " (" + actionType + "): " + details);
+
+                                // Capture failure screenshot
+                                if (screenshotOnFailure && EditorApplication.isPlaying)
+                                {
+                                    try
+                                    {
+                                        if (!Directory.Exists(failurePath))
+                                            Directory.CreateDirectory(failurePath);
+                                        string failFile = Path.Combine(failurePath,
+                                            testName.Replace(" ", "_") + "_action" + actionIndex
+                                            + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png")
+                                            .Replace("\\", "/");
+                                        var failNode = new SimpleJson.JsonNode();
+                                        failNode.obj = new Dictionary<string, SimpleJson.JsonNode>();
+                                        failNode.obj["path"] = new SimpleJson.JsonNode { str = failFile };
+                                        var dummyList = new List<string>();
+                                        PlayModeInteractor.ExecuteAction(failNode, "screenshot", dummyList);
+                                    }
+                                    catch { }
+                                }
+
+                                // Critical failure — stop test
+                                bool critical = action.Get("critical")?.AsBool() ?? false;
+                                if (critical)
+                                {
+                                    actionResults.Add(string.Format(CultureInfo.InvariantCulture,
+                                        "{{\"index\":{0},\"type\":\"{1}\",\"result\":\"failed\",\"duration\":{2},\"details\":\"{3}\"}}",
+                                        actionIndex, Esc(actionType), duration, Esc(details)));
+                                    shouldBreak = true;
+                                }
+                            }
+
+                            if (!shouldBreak)
+                            {
+                                actionResults.Add(string.Format(CultureInfo.InvariantCulture,
+                                    "{{\"index\":{0},\"type\":\"{1}\",\"result\":\"{2}\",\"duration\":{3},\"details\":\"{4}\"}}",
+                                    actionIndex, Esc(actionType), success ? "success" : "failed", duration, Esc(details)));
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        double duration = EditorApplication.timeSinceStartup - actionStart;
+                        overallResult = "Failed";
+                        errors.Add("Action " + actionIndex + " (" + actionType + "): " + e.Message);
+                        actionResults.Add(string.Format(CultureInfo.InvariantCulture,
+                            "{{\"index\":{0},\"type\":\"{1}\",\"result\":\"error\",\"duration\":{2},\"details\":\"{3}\"}}",
+                            actionIndex, Esc(actionType), duration, Esc(e.Message)));
+                    }
+
+                    // Yields must be outside try-catch per C# spec
+                    if (shouldBreak)
+                        break;
+
+                    if (yieldWaitSeconds >= 0f)
+                    {
+                        yield return new WaitForSeconds(yieldWaitSeconds);
+                        continue;
+                    }
+
+                    if (yieldWaitFrames >= 0)
+                    {
+                        for (int f = 0; f < yieldWaitFrames; f++)
+                            yield return null;
+                        continue;
+                    }
+
+                    // Default: yield one frame — Unity renders the Game view before resuming
+                    yield return null;
+                }
+
+                BuildFinalReport();
+            }
+
+            void BuildFinalReport()
+            {
+                running = false;
+                Application.runInBackground = previousRunInBackground;
+                double totalDuration = EditorApplication.timeSinceStartup - totalStart;
+
+                var screenshotEntries = new List<string>();
+                foreach (var s in screenshots) screenshotEntries.Add("\"" + Esc(s) + "\"");
+
+                var errorEntries = new List<string>();
+                foreach (var e in errors) errorEntries.Add("\"" + Esc(e) + "\"");
+
+                finalReport = string.Format(CultureInfo.InvariantCulture,
+                    "{{\"success\":true,\"status\":\"completed\",\"name\":\"{0}\",\"file\":\"{1}\",\"overallResult\":\"{2}\",\"duration\":{3:F1},\"actionResults\":[{4}],\"screenshots\":[{5}],\"errors\":[{6}]}}",
+                    Esc(testName), Esc(Path.GetFileName(testFile)), overallResult, totalDuration,
+                    string.Join(",", actionResults.ToArray()),
+                    string.Join(",", screenshotEntries.ToArray()),
+                    string.Join(",", errorEntries.ToArray()));
+
+                SaveReport(testName.Replace(" ", "_"), finalReport);
+            }
+        }
+
+        public static string RunTestAsync(string testFilePath)
+        {
+            if (!EditorApplication.isPlaying)
+                return "{\"success\":false,\"error\":\"RunTestAsync requires Play Mode\"}";
+
+            if (IntegrationTestBehaviour.ActiveInstance != null
+                && IntegrationTestBehaviour.ActiveInstance.GetStatus().Contains("\"running\""))
+                return "{\"success\":false,\"error\":\"A test is already running\"}";
+
+            if (string.IsNullOrEmpty(testFilePath) || !File.Exists(testFilePath))
+                return "{\"success\":false,\"error\":\"Test file not found: " + Esc(testFilePath ?? "") + "\"}";
+
+            try
+            {
+                string json = File.ReadAllText(testFilePath);
+                var test = SimpleJson.Parse(json);
+
+                string testName = test.GetString("name") ?? "Unnamed";
+                var actions = test.Get("actions");
+                if (actions == null || actions.arr == null || actions.arr.Count == 0)
+                    return "{\"success\":false,\"error\":\"No actions in test\"}";
+
+                // Clean up previous instance
+                if (IntegrationTestBehaviour.ActiveInstance != null)
+                    UnityEngine.Object.DestroyImmediate(IntegrationTestBehaviour.ActiveInstance.gameObject);
+
+                var go = new GameObject("[IntegrationTestRunner]");
+                var behaviour = go.AddComponent<IntegrationTestBehaviour>();
+                behaviour.StartTest(test, testFilePath);
+
+                return "{\"success\":true,\"status\":\"started\",\"name\":\"" + Esc(testName)
+                    + "\",\"actionCount\":" + actions.arr.Count + "}";
+            }
+            catch (Exception e)
+            {
+                return "{\"success\":false,\"error\":\"" + Esc(e.Message) + "\"}";
+            }
+        }
+
+        public static string GetTestStatus()
+        {
+            if (IntegrationTestBehaviour.ActiveInstance == null)
+                return "{\"success\":true,\"status\":\"idle\"}";
+
+            return IntegrationTestBehaviour.ActiveInstance.GetStatus();
         }
 
         // --- Helpers ---

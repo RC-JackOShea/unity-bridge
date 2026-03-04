@@ -379,6 +379,33 @@ namespace Game.Editor.Setup
                 panels[i].SetActive(i == 0);
             }
 
+            // Add "Load Scene 2" button to Panel3
+            var loadSceneBtn = CreateButtonChild(panels[2].transform, "LoadScene2Button",
+                "Load Scene 2", new Color(0.129f, 0.588f, 0.953f),
+                new Vector2(0.3f, 0.1f), new Vector2(0.7f, 0.25f));
+            var sceneLoaderType = FindGameType("Game.UI.SceneLoaderButton");
+            if (sceneLoaderType != null)
+            {
+                var loader = loadSceneBtn.AddComponent(sceneLoaderType);
+                var loaderSO = new SerializedObject(loader);
+                var sceneNameProp = loaderSO.FindProperty("sceneName");
+                if (sceneNameProp != null)
+                    sceneNameProp.stringValue = "SampleScene2";
+                loaderSO.ApplyModifiedPropertiesWithoutUndo();
+
+                // Wire onClick to SceneLoaderButton.LoadScene
+                var loadMethod = sceneLoaderType.GetMethod("LoadScene",
+                    BindingFlags.Public | BindingFlags.Instance);
+                if (loadMethod != null)
+                {
+                    var btn = loadSceneBtn.GetComponent<Button>();
+                    UnityEditor.Events.UnityEventTools.AddVoidPersistentListener(
+                        btn.onClick,
+                        (UnityEngine.Events.UnityAction)Delegate.CreateDelegate(
+                            typeof(UnityEngine.Events.UnityAction), loader, loadMethod));
+                }
+            }
+
             // Wire TabController serialized fields
             if (tabController != null)
             {

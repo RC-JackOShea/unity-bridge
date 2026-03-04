@@ -39,6 +39,7 @@ Script location: `.agent/tools/unity_bridge.sh`
 | `execute` | `<Method> [argsJson]` | Invoke a static C# method via reflection |
 | `integration_test` | `<test_file.json>` | Run single integration test (compile+play lifecycle) |
 | `integration_suite` | `<test_directory>` | Run all integration tests in directory |
+| `integration_run` | `<parent_directory>` | Run all suites with play mode cycling between groups |
 
 ## Execute Endpoint
 

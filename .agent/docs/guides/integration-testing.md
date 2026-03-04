@@ -82,6 +82,7 @@ execute UnityBridge.PlayModeUIScanner.GetInteractables
   "description": "What this test verifies",
   "tags": ["smoke", "navigation"],
   "setup": {
+    "scene": "SampleScene",
     "clearLogs": true,
     "waitAfterPlay": 1.0
   },
@@ -151,9 +152,69 @@ execute UnityBridge.IntegrationTestRunner.ListTests '["Assets/Tests/Integration"
 # Single test — handles compile + play enter/exit
 bash .agent/tools/unity_bridge.sh integration_test Assets/Tests/Integration/test.json
 
-# All tests in directory
-bash .agent/tools/unity_bridge.sh integration_suite Assets/Tests/Integration
+# All tests in directory (single play mode session)
+bash .agent/tools/unity_bridge.sh integration_suite Assets/Tests/Integration/tab_suite
+
+# Multi-suite run with play mode cycling (recommended for mixed test directories)
+bash .agent/tools/unity_bridge.sh integration_run Assets/Tests/Integration
 ```
+
+### Multi-Suite Runs (integration_run)
+
+`integration_run` discovers tests in a parent directory and runs them with full isolation between groups:
+
+**Directory discovery:**
+- Loose `.json` files at the top level are **standalone tests** — each gets its own play mode session
+- Immediate subdirectories containing `.json` files are **suites** — each suite shares one play mode session
+- Standalones run first (alphabetically), then suites (alphabetically)
+
+**Example directory structure:**
+```
+Assets/Tests/Integration/
+├── scene_navigation.json     ← standalone (own play mode session)
+├── tab_navigation.json       ← standalone (own play mode session)
+└── tab_suite/                ← suite (one shared play mode session)
+    ├── 01_tabs_forward.json
+    ├── 02_tabs_reverse.json
+    └── 03_tabs_mixed.json
+```
+
+**Execution flow:**
+```
+integration_run Assets/Tests/Integration/
+  ├── compile (once, up front)
+  ├── [1] scene_navigation.json   → play enter → run → play exit
+  ├── [2] tab_navigation.json     → play enter → run → play exit
+  ├── [3] tab_suite/              → play enter → run 01, 02, 03 → play exit
+  └── Aggregate report (total tests, passed, failed)
+```
+
+**Scene loading:**
+Each test can declare a starting scene via `setup.scene` in its JSON. Before each test runs (both standalones and within suites), the runner loads the declared scene via `SceneManager.LoadScene`. Tests without `setup.scene` skip scene loading and run on whatever scene is currently active.
+
+**Isolation model:**
+- Between groups: full play mode exit/enter cycle (clean slate)
+- Within a suite: `setup.scene` reload before each test (declared per-test)
+- Compilation: once at the start, not per-group
+
+**When to use which command:**
+| Command | Use case |
+|---------|----------|
+| `integration_test` | Run a single test file |
+| `integration_suite` | Run related tests in one directory (shared play mode) |
+| `integration_run` | Run all tests across multiple suites with isolation |
+
+### Via Editor Window (Tools > Unity Bridge > Monitor Window)
+
+The **Tests tab** in the Unity Bridge window provides a visual test runner:
+
+- **Test Directory** — set the root directory containing test suites
+- **Refresh** — re-discover suites and tests from disk
+- **Run All** — runs every discovered suite with play mode cycling between suites (matches `integration_run` isolation)
+- **Run Suite** — runs all tests in one suite within a single play mode session
+- **Run** (per test) — runs an individual test
+
+All buttons work from Edit Mode — the window opens the correct scene, enters play mode, runs the test(s), and exits play mode automatically. During execution a status bar shows progress, and between-suite transitions cycle play mode for full isolation.
 
 ## Saving Tests
 

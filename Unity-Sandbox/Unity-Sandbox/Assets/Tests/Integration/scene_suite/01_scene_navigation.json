@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "name": "Scene Navigation via Tab 3 Button",
+  "description": "Navigates to Tab 3, taps the Load Scene 2 button, and verifies arrival in SampleScene2",
+  "tags": ["scene", "navigation", "cross-scene"],
+  "setup": {
+    "scene": "SampleScene",
+    "clearLogs": true,
+    "waitAfterPlay": 0.5
+  },
+  "actions": [
+    { "type": "scan_ui", "comment": "Discover initial UI layout" },
+
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel1", "expected": true, "comment": "Starting on Panel1" },
+
+    { "type": "tap_element", "path": "UICanvas/TabSystem/TabBar/Tab3" },
+    { "type": "wait_seconds", "duration": 1.0 },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel3", "expected": true, "critical": true },
+
+    { "type": "tap_element", "path": "UICanvas/TabSystem/ContentArea/Panel3/LoadScene2Button", "critical": true },
+    { "type": "wait_seconds", "duration": 2.0, "comment": "Wait for scene load" },
+
+    { "type": "scan_ui", "comment": "Re-scan after scene transition" },
+    { "type": "assert_active", "path": "Scene2Canvas", "expected": true, "critical": true },
+    { "type": "assert_text", "path": "Scene2Canvas/WelcomeText", "expected": "Welcome to Scene 2" }
+  ],
+  "teardown": {
+    "screenshotOnFailure": true,
+    "failurePath": "C:/temp/tests/failures/"
+  }
+}

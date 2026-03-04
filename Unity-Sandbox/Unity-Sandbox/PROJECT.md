@@ -18,6 +18,7 @@ Project-specific editor tools for asset creation and scene population. These are
 | `SandboxPrefabSetup` | `execute Game.Editor.Setup.SandboxPrefabSetup.ValidatePrefabs` | Validates all expected prefab and asset files exist |
 | `SandboxSceneSetup` | `execute Game.Editor.Setup.SandboxSceneSetup.PopulateScene` | Places prefab instances into SampleScene with correct positions |
 | `SandboxSceneSetup` | `execute Game.Editor.Setup.SandboxSceneSetup.ValidateScene` | Validates scene has all expected objects with intact prefab links |
+| `SandboxSceneSetup` | `execute Game.Editor.Setup.SandboxSceneSetup.CreateSampleScene2` | Creates SampleScene2 with welcome text and adds to build settings |
 
 ## Bridge Test Harnesses
 
@@ -52,6 +53,13 @@ Agent-callable test methods for runtime verification.
 |-------|------|-------------|
 | `ScoreManager` | `Assets/Resources/ScriptableObjects/ScoreManager.asset` | Score state management |
 
+## Scenes
+
+| Scene | Path | Description |
+|-------|------|-------------|
+| `SampleScene` | `Assets/Scenes/SampleScene.unity` | Main scene with gameplay and UI |
+| `SampleScene2` | `Assets/Scenes/SampleScene2.unity` | Secondary scene with welcome text (loaded via SceneLoaderButton) |
+
 ## Scene Layout
 
 Objects placed in the main scene and their positions:
@@ -68,4 +76,5 @@ Objects placed in the main scene and their positions:
 - **Single Canvas rule:** All screen-space UI lives under UICanvas. Never add a second ScreenSpace canvas.
 - **PauseGroup overlay** starts hidden (`SetActive(false)`). `PauseMenuController` toggles visibility.
 - **ScoreTrigger** uses SerializedObject fields: `scoreManager`, `pointValue` (1), `maxUses` (10).
+- **SceneLoaderButton** on Panel3 loads `SampleScene2` via `SceneManager.LoadScene`. Serialized field: `sceneName`.
 - **Test harness namespace:** `Game.BridgeTests`, location: `Assets/Scripts/BridgeTests/`.

@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace Game.Editor.Setup
 {
@@ -161,6 +163,88 @@ namespace Game.Editor.Setup
             {
                 return "{\"success\":false,\"error\":\"" + Esc(e.Message) + "\"}";
             }
+        }
+
+        public static string CreateSampleScene2()
+        {
+            try
+            {
+                string scene2Path = "Assets/Scenes/SampleScene2.unity";
+
+                // Create a new empty scene
+                var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+                // Camera
+                var camGo = new GameObject("Main Camera");
+                camGo.tag = "MainCamera";
+                var cam = camGo.AddComponent<Camera>();
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = new Color(0.1f, 0.1f, 0.2f);
+                camGo.transform.position = new Vector3(0, 1, -10);
+
+                // Directional Light
+                var lightGo = new GameObject("Directional Light");
+                var light = lightGo.AddComponent<Light>();
+                light.type = LightType.Directional;
+                lightGo.transform.rotation = Quaternion.Euler(50, -30, 0);
+
+                // Canvas with welcome text
+                var canvasGo = new GameObject("Scene2Canvas");
+                var canvas = canvasGo.AddComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvasGo.AddComponent<CanvasScaler>();
+                canvasGo.AddComponent<GraphicRaycaster>();
+
+                var textGo = new GameObject("WelcomeText");
+                textGo.transform.SetParent(canvasGo.transform, false);
+                var tmp = textGo.AddComponent<TextMeshProUGUI>();
+                tmp.text = "Welcome to Scene 2";
+                tmp.fontSize = 48;
+                tmp.color = Color.white;
+                tmp.alignment = TextAlignmentOptions.Center;
+                var rt = textGo.GetComponent<RectTransform>();
+                rt.anchorMin = new Vector2(0.1f, 0.4f);
+                rt.anchorMax = new Vector2(0.9f, 0.6f);
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+
+                // Ensure Scenes directory exists
+                if (!AssetDatabase.IsValidFolder("Assets/Scenes"))
+                    AssetDatabase.CreateFolder("Assets", "Scenes");
+
+                // Save the scene
+                EditorSceneManager.SaveScene(scene, scene2Path);
+
+                // Add both scenes to build settings
+                EnsureBuildScenes(new[] { ScenePath, scene2Path });
+
+                return "{\"success\":true,\"message\":\"SampleScene2 created and added to build settings\"}";
+            }
+            catch (Exception e)
+            {
+                return "{\"success\":false,\"error\":\"" + Esc(e.Message) + "\"}";
+            }
+        }
+
+        private static void EnsureBuildScenes(string[] scenePaths)
+        {
+            var buildScenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
+            foreach (var path in scenePaths)
+            {
+                bool found = false;
+                foreach (var bs in buildScenes)
+                {
+                    if (bs.path == path)
+                    {
+                        found = true;
+                        bs.enabled = true;
+                        break;
+                    }
+                }
+                if (!found)
+                    buildScenes.Add(new EditorBuildSettingsScene(path, true));
+            }
+            EditorBuildSettings.scenes = buildScenes.ToArray();
         }
 
         private static bool IsGamePrefabInstance(string name)

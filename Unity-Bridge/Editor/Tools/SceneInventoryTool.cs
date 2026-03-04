@@ -18,6 +18,72 @@ namespace UnityBridge
     {
         private const int MAX_DEPTH = 50;
 
+        // ── Scene Management ──────────────────────────────────────────
+
+        /// <summary>
+        /// Returns the name of the currently active scene.
+        /// Works in both Edit and Play mode.
+        /// Callable via: execute UnityBridge.SceneInventoryTool.GetActiveScene
+        /// </summary>
+        public static string GetActiveScene()
+        {
+            var scene = SceneManager.GetActiveScene();
+            return string.Format(
+                "{{\"success\":true,\"name\":\"{0}\",\"path\":\"{1}\",\"buildIndex\":{2},\"isLoaded\":{3}}}",
+                EscapeJson(scene.name),
+                EscapeJson(scene.path),
+                scene.buildIndex,
+                scene.isLoaded ? "true" : "false"
+            );
+        }
+
+        /// <summary>
+        /// Loads a scene by name at runtime (Play Mode only).
+        /// Callable via: execute UnityBridge.SceneInventoryTool.LoadScene '["SampleScene"]'
+        /// </summary>
+        public static string LoadScene(string sceneName)
+        {
+            if (string.IsNullOrEmpty(sceneName))
+                return "{\"success\":false,\"error\":\"sceneName is required\"}";
+
+            if (!Application.isPlaying)
+                return "{\"success\":false,\"error\":\"LoadScene requires Play Mode\"}";
+
+            SceneManager.LoadScene(sceneName);
+            return string.Format(
+                "{{\"success\":true,\"scene\":\"{0}\"}}",
+                EscapeJson(sceneName)
+            );
+        }
+
+        /// <summary>
+        /// Opens a scene in the Editor (Edit Mode only).
+        /// Callable via: execute UnityBridge.SceneInventoryTool.OpenScene '["Assets/Scenes/MyScene.unity"]'
+        /// </summary>
+        public static string OpenScene(string scenePath)
+        {
+            if (string.IsNullOrEmpty(scenePath))
+                return "{\"success\":false,\"error\":\"scenePath is required\"}";
+
+            if (Application.isPlaying)
+                return "{\"success\":false,\"error\":\"OpenScene cannot be used in Play Mode — use LoadScene instead\"}";
+
+            var scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            if (!scene.IsValid())
+                return string.Format(
+                    "{{\"success\":false,\"error\":\"Failed to open scene: {0}\"}}",
+                    EscapeJson(scenePath)
+                );
+
+            return string.Format(
+                "{{\"success\":true,\"name\":\"{0}\",\"path\":\"{1}\"}}",
+                EscapeJson(scene.name),
+                EscapeJson(scene.path)
+            );
+        }
+
+        // ── Scene Discovery ──────────────────────────────────────────
+
         /// <summary>
         /// Discovers all .unity scene files in Assets/ and returns build info.
         /// </summary>

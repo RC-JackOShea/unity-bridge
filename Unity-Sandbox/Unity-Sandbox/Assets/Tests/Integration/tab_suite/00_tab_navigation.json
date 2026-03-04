@@ -4,8 +4,9 @@
   "description": "Clicks through all 5 tabs with 1-second pauses, verifies each panel activates and tab highlights",
   "tags": ["tabs", "navigation", "smoke"],
   "setup": {
+    "scene": "SampleScene",
     "clearLogs": true,
-    "waitAfterPlay": 1.0
+    "waitAfterPlay": 0
   },
   "actions": [
     { "type": "scan_ui", "comment": "Discover UI layout" },

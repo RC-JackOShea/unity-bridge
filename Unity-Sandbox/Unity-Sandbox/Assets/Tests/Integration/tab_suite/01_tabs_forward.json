@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "name": "Tabs Forward (1-2-3-4-5)",
+  "description": "Navigates tabs sequentially forward from tab 1 to tab 5",
+  "tags": ["tabs", "navigation", "suite"],
+  "setup": { "scene": "SampleScene", "clearLogs": true, "waitAfterPlay": 0 },
+  "actions": [
+    { "type": "scan_ui" },
+
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel1", "expected": true },
+
+    { "type": "tap_element", "path": "UICanvas/TabSystem/TabBar/Tab2" },
+    { "type": "wait_seconds", "duration": 1.0 },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel2", "expected": true },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel1", "expected": false },
+
+    { "type": "tap_element", "path": "UICanvas/TabSystem/TabBar/Tab3" },
+    { "type": "wait_seconds", "duration": 1.0 },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel3", "expected": true },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel2", "expected": false },
+
+    { "type": "tap_element", "path": "UICanvas/TabSystem/TabBar/Tab4" },
+    { "type": "wait_seconds", "duration": 1.0 },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel4", "expected": true },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel3", "expected": false },
+
+    { "type": "tap_element", "path": "UICanvas/TabSystem/TabBar/Tab5" },
+    { "type": "wait_seconds", "duration": 1.0 },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel5", "expected": true },
+    { "type": "assert_active", "path": "UICanvas/TabSystem/ContentArea/Panel4", "expected": false }
+  ],
+  "teardown": { "screenshotOnFailure": true, "failurePath": "C:/temp/tests/failures/" }
+}
